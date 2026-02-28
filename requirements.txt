@@ -1,4 +1,3 @@
-Resolved 190 packages in 4ms
 aiobotocore==3.2.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.3
