@@ -30,7 +30,6 @@ def train_logistic_baseline(
     X_scaled = scaler.fit_transform(X)
 
     model = LogisticRegression(
-        multi_class="multinomial",
         max_iter=1000,
         class_weight="balanced",
         random_state=42,
