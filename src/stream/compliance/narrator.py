@@ -4,9 +4,6 @@ Translates SHAP explanations into analyst-ready SAR narratives.
 This is the full compliance stack: model scores → SHAP explains → LLM narrates.
 """
 
-import hashlib
-import json
-
 import structlog
 
 log = structlog.get_logger()
@@ -39,24 +36,12 @@ async def generate_compliance_narrative(
     shap_values: list[float],
     feature_names: list[str],
     top_k: int = 5,
-    redis_client=None,
 ) -> str:
     """Generate a compliance-ready narrative from SHAP explanation.
 
     Uses Claude Haiku for speed + cost efficiency in production.
     """
     top_features = get_top_shap_features(shap_values, feature_names, top_k)
-
-    # Check cache
-    cache_key = None
-    if redis_client:
-        feature_hash = hashlib.sha256(
-            json.dumps({"score": risk_score, "features": top_features}).encode()
-        ).hexdigest()[:16]
-        cache_key = f"narrative:{feature_hash}"
-        cached = await redis_client.get(cache_key)
-        if cached:
-            return cached.decode()
 
     try:
         from anthropic import AsyncAnthropic
@@ -78,17 +63,10 @@ Top contributing features:
 Write 2-3 sentences suitable for a SAR filing. Be specific about which patterns triggered the flag. Use financial compliance terminology."""
             }]
         )
-        narrative = response.content[0].text
-
-        # Cache result
-        if redis_client and cache_key:
-            await redis_client.set(cache_key, narrative, ex=300)  # 5 min TTL
-
-        return narrative
+        return response.content[0].text
 
     except Exception as e:
         log.warning("Narrative generation failed", error=str(e))
-        # Fallback: template-based narrative
         return _template_narrative(risk_score, top_features)
 
 

@@ -15,6 +15,8 @@ from stream.app.components import (
     Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge,
 )
 from stream.app.models import get_model
+from stream.db import write_in_thread, save_prediction, save_alert, SessionLocal
+from stream.services import score_transaction, RISK_THRESHOLD
 
 log = structlog.get_logger()
 
@@ -307,17 +309,50 @@ def register_api_routes(rt):
 
     @rt("/api/v1/alerts/recent")
     def recent_alerts():
-        # Demo data
-        alerts = [
+        from stream.models.alerts import AlertRecord
+
+        rows = []
+        try:
+            db = SessionLocal()
+            try:
+                alerts = (
+                    db.query(AlertRecord)
+                    .order_by(AlertRecord.timestamp.desc())
+                    .limit(20)
+                    .all()
+                )
+            finally:
+                db.close()
+
+            if alerts:
+                for a in alerts:
+                    ts = a.timestamp.strftime("%H:%M:%S") if a.timestamp else "—"
+                    tx_short = f"{a.tx_id[:4]}...{a.tx_id[-4:]}" if len(a.tx_id) > 8 else a.tx_id
+                    score = a.risk_score
+                    risk_cls = "risk-high" if score > 0.7 else "risk-medium" if score > 0.4 else "risk-low"
+                    badge = "badge-red" if a.status == "escalated" else "badge-yellow" if a.status == "pending" else "badge-green"
+                    rows.append(Tr(
+                        Td(ts, style="color: var(--fg-dim);"),
+                        Td(tx_short, style="font-weight: bold;"),
+                        Td(f"{score:.2f}", cls=risk_cls),
+                        Td(a.risk_label.upper()),
+                        Td(Span(a.status.upper(), cls=f"badge-sm {badge}")),
+                        Td(A("Review", href="#", cls="spark-btn", style="padding: 4px 8px; font-size: 9px;",
+                              **{"hx-get": f"/api/v1/alerts/detail/{a.tx_id}", "hx-target": "#alert-detail"})),
+                    ))
+                return rows
+        except Exception as e:
+            log.debug("DB query failed for alerts, falling back to demo", error=str(e))
+
+        # Demo fallback
+        demo = [
             ("14:23:01", "7a3f...e91b", 0.92, "HIGH", "pending"),
             ("14:21:45", "b2c8...4d3a", 0.78, "HIGH", "pending"),
             ("14:19:22", "e5f1...8c7d", 0.45, "MEDIUM", "reviewed"),
             ("14:15:08", "1d9a...f2b6", 0.23, "LOW", "auto_cleared"),
             ("14:12:33", "c4e7...a1d8", 0.88, "HIGH", "escalated"),
         ]
-
-        rows = []
-        for ts, tx, score, label, status in alerts:
+        for ts, tx, score, label, status in demo:
             risk_cls = "risk-high" if score > 0.7 else "risk-medium" if score > 0.4 else "risk-low"
             badge = "badge-red" if status == "escalated" else "badge-yellow" if status == "pending" else "badge-green"
             rows.append(Tr(
@@ -332,7 +367,87 @@ def register_api_routes(rt):
         return rows
 
     @rt("/api/v1/alerts/detail/{tx_id}")
-    def alert_detail(tx_id: str):
+    async def alert_detail(tx_id: str):
+        from stream.models.alerts import AlertRecord
+        from stream.compliance.narrator import generate_compliance_narrative
+
+        alert = None
+        try:
+            db = SessionLocal()
+            try:
+                alert = db.query(AlertRecord).filter(AlertRecord.tx_id == tx_id).first()
+            finally:
+                db.close()
+        except Exception as e:
+            log.debug("DB lookup failed for alert detail", error=str(e))
+
+        if alert:
+            score = alert.risk_score
+            model_name = alert.model_name or "illicit-xgboost"
+            shap_data = alert.explanation or []
+
+            # SHAP display
+            shap_lines = []
+            if shap_data:
+                for f in shap_data:
+                    val = f.get("shap_value", 0)
+                    color = "var(--fg-red)" if val > 0.1 else "var(--fg-orange)" if val > 0 else "var(--fg-green)"
+                    shap_lines.append(
+                        P(f"{f.get('feature', '?')}: {val:+.4f}", style=f"color: {color};")
+                    )
+            else:
+                shap_lines.append(P("No SHAP data available.", style="color: var(--fg-dim);"))
+
+            # Generate narrative on-demand
+            narrative_text = alert.narrative
+            if not narrative_text:
+                if shap_data:
+                    shap_vals = [f.get("shap_value", 0) for f in shap_data]
+                    feat_names = [f.get("feature", "?") for f in shap_data]
+                    narrative_text = await generate_compliance_narrative(
+                        risk_score=score, shap_values=shap_vals,
+                        feature_names=feat_names,
+                    )
+                    # Persist back to alert row
+                    try:
+                        db = SessionLocal()
+                        try:
+                            db.query(AlertRecord).filter(
+                                AlertRecord.tx_id == tx_id
+                            ).update({"narrative": narrative_text})
+                            db.commit()
+                        finally:
+                            db.close()
+                    except Exception:
+                        pass
+                else:
+                    narrative_text = (
+                        f"Transaction flagged with risk score {score:.2f}. "
+                        "SHAP explanation unavailable — recommend manual review."
+                    )
+
+            return Div(
+                H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
+                DataGrid(
+                    DataReadout("RISK_SCORE", f"{score:.2f}", variant="danger" if score > 0.7 else ""),
+                    DataReadout("MODEL", model_name),
+                    DataReadout("STATUS", alert.status.upper()),
+                ),
+                H4("SHAP Explanation", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                Div(*shap_lines, style="margin-bottom: 16px;"),
+                H4("AI Compliance Narrative", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                Div(
+                    P(narrative_text,
+                      style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;"),
+                ),
+                Div(
+                    Button("Mark as True Positive", cls="spark-btn", style="margin-right: 8px;"),
+                    Button("Mark as False Positive", cls="spark-btn"),
+                    style="margin-top: 16px;",
+                ),
+            )
+
+        # Demo fallback
         return Div(
             H4(f"Alert: {tx_id}", style="color: var(--fg-green); margin-bottom: 12px;"),
             DataGrid(
@@ -351,7 +466,7 @@ def register_api_routes(rt):
             ),
             H4("AI Compliance Narrative", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
             Div(
-                P("This transaction was flagged (risk score: 0.92) due to patterns consistent with structuring: the aggregated neighbor transaction volume (feature 47) is 3.2 standard deviations above the population mean, combined with an unusual output count (feature 12) suggesting fund splitting. The transaction's graph neighborhood shows connections to addresses previously associated with mixing services.",
+                P("This transaction was flagged (risk score: 0.92) due to patterns consistent with structuring.",
                   style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;"),
             ),
             Div(
@@ -475,8 +590,6 @@ def register_api_routes(rt):
 
     @rt("/api/v1/integration/webhook", methods=["POST"])
     async def webhook_score(request):
-        start = time.time()
-
         try:
             form = await request.form()
             payload_str = form.get("payload", "{}")
@@ -488,25 +601,47 @@ def register_api_routes(rt):
                 payload = {}
 
         correlation_id = payload.get("correlation_id", str(uuid.uuid4()))
-        features = payload.get("features", [])
+        txid = payload.get("txid", correlation_id)
+        vsize = int(payload.get("vsize", 250))
+        fee = int(payload.get("fee", 1000))
 
-        risk_score = float(np.random.beta(2, 5))
-        risk_label = "high" if risk_score > 0.7 else "medium" if risk_score > 0.4 else "low"
-        inference_ms = (time.time() - start) * 1000
+        scored = await score_transaction(txid, vsize, fee)
+
+        audit_id = str(uuid.uuid4())
+
+        # Persist prediction
+        await write_in_thread(save_prediction, {
+            "model_name": scored["model_name"],
+            "model_version": scored["model_version"],
+            "input_hash": scored["input_hash"],
+            "risk_score": scored["risk_score"],
+            "risk_label": scored["risk_label"],
+            "threshold_used": RISK_THRESHOLD,
+            "top_shap_features": scored["shap_features"],
+            "inference_time_ms": scored["inference_ms"],
+        })
+
+        # Persist alert if above threshold
+        if scored["risk_score"] > RISK_THRESHOLD:
+            await write_in_thread(save_alert, {
+                "tx_id": txid,
+                "risk_score": scored["risk_score"],
+                "risk_label": scored["risk_label"],
+                "model_name": scored["model_name"],
+                "explanation": scored["shap_features"],
+            })
 
         result = {
             "correlation_id": correlation_id,
-            "risk_score": round(risk_score, 4),
-            "risk_label": risk_label,
-            "explanation": [
-                {"feature": "feature_47", "shap_value": 0.234},
-                {"feature": "feature_12", "shap_value": 0.189},
-            ],
+            "risk_score": scored["risk_score"],
+            "risk_label": scored["risk_label"],
+            "explanation": scored["shap_features"],
             "narrative": None,
-            "model_version": "illicit-xgboost-v1.0",
-            "audit_id": str(uuid.uuid4()),
-            "action": "auto_clear" if risk_label == "low" else "queue_review",
-            "inference_time_ms": round(inference_ms, 2),
+            "model_version": scored["model_version"],
+            "audit_id": audit_id,
+            "action": "auto_clear" if scored["risk_label"] == "LOW" else "queue_review",
+            "inference_time_ms": scored["inference_ms"],
+            "is_demo": scored["is_demo"],
         }
 
         # Return as formatted HTML for the walkthrough page, or JSON for API
@@ -546,8 +681,9 @@ def register_api_routes(rt):
                         fee = tx.get("fee", 0)
                         fee_rate = fee / max(vsize, 1)
 
-                        risk_score = float(np.random.beta(2, 8))
-                        risk_label = "HIGH" if risk_score > 0.7 else "MED" if risk_score > 0.4 else "LOW"
+                        result = await score_transaction(txid, vsize, fee)
+                        risk_score = result["risk_score"]
+                        risk_label = result["risk_label"]
                         risk_cls = "risk-high" if risk_score > 0.7 else "risk-medium" if risk_score > 0.4 else "risk-low"
 
                         now = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
@@ -562,6 +698,28 @@ def register_api_routes(rt):
                         </div>"""
 
                         yield {"event": "transaction_scored", "data": html}
+
+                        # Persist prediction audit
+                        await write_in_thread(save_prediction, {
+                            "model_name": result["model_name"],
+                            "model_version": result["model_version"],
+                            "input_hash": result["input_hash"],
+                            "risk_score": risk_score,
+                            "risk_label": risk_label,
+                            "threshold_used": RISK_THRESHOLD,
+                            "top_shap_features": result["shap_features"],
+                            "inference_time_ms": result["inference_ms"],
+                        })
+
+                        # Create alert if above threshold
+                        if risk_score > RISK_THRESHOLD:
+                            await write_in_thread(save_alert, {
+                                "tx_id": txid,
+                                "risk_score": risk_score,
+                                "risk_label": risk_label,
+                                "model_name": result["model_name"],
+                                "explanation": result["shap_features"],
+                            })
 
                 except Exception as e:
                     log.debug("Stream error", error=str(e))

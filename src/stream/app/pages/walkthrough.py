@@ -18,11 +18,11 @@ def walkthrough_overview():
 
             WalkthroughSection(
                 "Architecture",
-                "Prefect Cloud orchestrates training pipelines. Models are stored in Cloudflare R2 via S3-compatible API. FastHTML on Railway serves the dashboard and scoring API. Postgres stores audit trails, Redis caches predictions and LLM narratives. mempool.space provides live Bitcoin data.",
+                "Prefect Cloud orchestrates training pipelines. Models are stored in Cloudflare R2 via S3-compatible API. FastHTML on Railway serves the dashboard and scoring API. Postgres stores audit trails and prediction logs. mempool.space provides live Bitcoin data.",
                 """Prefect Cloud (training)
   -> Cloudflare R2 (model storage)
   -> FastHTML on Railway (serving + dashboard)
-  <- Postgres + Redis on Railway (data + cache)
+  <- Postgres on Railway (audit trail + cache)
   <- mempool.space API (live Bitcoin data)""",
             ),
 

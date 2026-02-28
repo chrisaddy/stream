@@ -7,9 +7,6 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/stream"
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-
     # Prefect
     PREFECT_API_URL: str = ""
     PREFECT_API_KEY: str = ""
