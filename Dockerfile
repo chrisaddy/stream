@@ -9,4 +9,4 @@ RUN uv sync --frozen --no-dev
 
 COPY src/ src/
 
-CMD uv run uvicorn stream.app.main:app --host 0.0.0.0 --port ${PORT:-5000}
+ENTRYPOINT ["uv", "run", "uvicorn", "stream.app.main:app", "--host", "0.0.0.0", "--port", "5000", "--log-level", "info"]

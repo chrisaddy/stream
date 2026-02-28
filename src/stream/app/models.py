@@ -13,8 +13,9 @@ _models: dict = {}
 def _load_from_r2(path: str) -> bytes | None:
     """Try to load model bytes from R2 via Prefect S3 block."""
     try:
+        import asyncio
         from prefect_aws.s3 import S3Bucket
-        s3 = S3Bucket.load("model-store")
+        s3 = asyncio.get_event_loop().run_until_complete(S3Bucket.load("model-store"))
         return s3.read_path(path)
     except Exception as e:
         log.debug("R2 load failed", path=path, error=str(e))
