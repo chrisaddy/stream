@@ -11,12 +11,20 @@ _models: dict = {}
 
 
 def _load_from_r2(path: str) -> bytes | None:
-    """Try to load model bytes from R2 via Prefect S3 block."""
+    """Try to load model bytes from R2 via boto3 (sync-safe)."""
     try:
-        import asyncio
-        from prefect_aws.s3 import S3Bucket
-        s3 = asyncio.get_event_loop().run_until_complete(S3Bucket.load("model-store"))
-        return s3.read_path(path)
+        import boto3
+        from stream.config import settings
+        if not settings.R2_ENDPOINT_URL:
+            return None
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=settings.R2_ENDPOINT_URL,
+            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+        )
+        resp = s3.get_object(Bucket=settings.R2_BUCKET_NAME, Key=path)
+        return resp["Body"].read()
     except Exception as e:
         log.debug("R2 load failed", path=path, error=str(e))
         return None
