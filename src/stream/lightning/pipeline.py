@@ -46,9 +46,10 @@ def train_model(features):
 @task(name="save-lightning-model")
 def save_model(model, name: str = "lightning-lgbm"):
     try:
+        from io import BytesIO
         from prefect_aws.s3 import S3Bucket
         s3 = S3Bucket.load("model-store")
-        s3.upload_from_bytes(serialize_lightning_model(model), f"models/{name}/latest.pkl")
+        s3.upload_from_file_object(BytesIO(serialize_lightning_model(model)), f"models/{name}/latest.pkl")
     except Exception as e:
         log.warning("R2 upload failed, saving locally", error=str(e))
         import os

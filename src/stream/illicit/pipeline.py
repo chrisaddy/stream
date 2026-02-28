@@ -76,10 +76,11 @@ def evaluate_model(model, X_test, y_test, timesteps, labels):
 def save_model_to_r2(model, name: str = "illicit-xgboost"):
     """Save model to R2 via Prefect S3 block."""
     try:
+        from io import BytesIO
         from prefect_aws.s3 import S3Bucket
         s3 = S3Bucket.load("model-store")
         model_bytes = serialize_model(model)
-        s3.upload_from_bytes(model_bytes, f"models/{name}/latest.pkl")
+        s3.upload_from_file_object(BytesIO(model_bytes), f"models/{name}/latest.pkl")
         log.info("Model saved to R2", name=name, size_bytes=len(model_bytes))
     except Exception as e:
         # Fallback: save locally
