@@ -1,0 +1,449 @@
+<html lang="en" vid="0">
+
+<head vid="1">
+	<meta charset="UTF-8" vid="2">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+	<title vid="4">Spark Research Diagnostic // Signal Extractor</title>
+	<style vid="5">
+		:root {
+			--bg-color: #080808;
+			--fg-white: #e0e0e0;
+			--fg-green: #33ff77;
+			--fg-dim: #444444;
+			--grid-line: rgba(255, 255, 255, 0.1);
+			--font-mono: 'Courier New', Courier, monospace;
+		}
+
+		* {
+			box-sizing: border-box;
+			user-select: none;
+		}
+
+		body {
+			margin: 0;
+			padding: 0;
+			background-color: var(--bg-color);
+			color: var(--fg-white);
+			font-family: var(--font-mono);
+			overflow: hidden;
+			width: 100vw;
+			height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+
+		.noise-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+			z-index: 999;
+			opacity: 0.12;
+			background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+		}
+
+
+		.diagnostic-frame {
+			position: relative;
+			width: 90vw;
+			height: 85vh;
+			border: 1px solid var(--fg-dim);
+			display: grid;
+			grid-template-rows: 40px 1fr 40px;
+
+		}
+
+
+		.meta-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 0 16px;
+			border-bottom: 1px solid var(--fg-dim);
+			font-size: 11px;
+			letter-spacing: 1px;
+			text-transform: uppercase;
+		}
+
+		.meta-header span {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+
+		.visual-stage {
+			position: relative;
+			width: 100%;
+			height: 100%;
+			background:
+				linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+				linear-gradient(180deg, var(--grid-line) 1px, transparent 1px);
+			background-size: 40px 40px;
+			overflow: hidden;
+		}
+
+
+		canvas#oscilloscope {
+			display: block;
+			width: 100%;
+			height: 100%;
+			filter: drop-shadow(0 0 4px rgba(51, 255, 119, 0.4));
+		}
+
+
+		.meta-footer {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 0 16px;
+			border-top: 1px solid var(--fg-dim);
+			font-size: 10px;
+			color: var(--fg-dim);
+			letter-spacing: 2px;
+		}
+
+
+		.data-readout {
+			position: absolute;
+			top: 20px;
+			right: 20px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			text-align: right;
+			font-size: 12px;
+			color: var(--fg-green);
+		}
+
+		.data-row {
+			display: flex;
+			justify-content: flex-end;
+			gap: 12px;
+		}
+
+		.label {
+			color: var(--fg-white);
+			opacity: 0.7;
+		}
+
+		.value {
+			font-weight: bold;
+			min-width: 60px;
+		}
+
+		.insight-counter-box {
+			position: absolute;
+			bottom: 40px;
+			left: 50%;
+			transform: translateX(-50%);
+			border: 1px solid var(--fg-green);
+			padding: 8px 16px;
+			background: rgba(0, 20, 5, 0.8);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			box-shadow: 0 0 15px rgba(51, 255, 119, 0.1);
+		}
+
+		.counter-label {
+			font-size: 9px;
+			color: var(--fg-white);
+			margin-bottom: 4px;
+			letter-spacing: 1px;
+		}
+
+		.counter-value {
+			font-size: 24px;
+			color: var(--fg-green);
+			letter-spacing: 2px;
+		}
+
+
+		.crosshair {
+			position: absolute;
+			width: 20px;
+			height: 20px;
+			border-left: 1px solid var(--fg-dim);
+			border-top: 1px solid var(--fg-dim);
+		}
+
+		.ch-tl {
+			top: 0;
+			left: 0;
+		}
+
+		.ch-tr {
+			top: 0;
+			right: 0;
+			transform: rotate(90deg);
+		}
+
+		.ch-bl {
+			bottom: 0;
+			left: 0;
+			transform: rotate(-90deg);
+		}
+
+		.ch-br {
+			bottom: 0;
+			right: 0;
+			transform: rotate(180deg);
+		}
+
+		.diagram-label {
+			position: absolute;
+			font-size: 9px;
+			color: var(--fg-dim);
+			transform-origin: 0 0;
+		}
+
+		.badge {
+			border: 1px solid var(--fg-white);
+			padding: 2px 6px;
+			font-size: 9px;
+			color: var(--fg-white);
+		}
+	</style>
+</head>
+
+<body vid="6">
+
+	<div class="noise-overlay" vid="7"></div>
+
+	<div class="diagnostic-frame" vid="8">
+
+		<div class="meta-header" vid="9">
+			<span vid="10">SPARK DIAGNOSTIC <span class="badge" vid="11">V.0.4</span></span>
+			<span vid="12">[ SYSTEM_ACTIVE ]</span>
+		</div>
+
+
+		<div class="visual-stage" vid="13">
+			<div class="crosshair ch-tl" vid="14"></div>
+			<div class="crosshair ch-tr" vid="15"></div>
+			<div class="crosshair ch-bl" vid="16"></div>
+			<div class="crosshair ch-br" vid="17"></div>
+
+
+			<div class="diagram-label" style="top: 15%; left: 5%;" vid="18">[INPUT_SOURCE_ALPHA]</div>
+			<div class="diagram-label" style="top: 25%; left: 5%;" vid="19">[INPUT_SOURCE_BETA]</div>
+			<div class="diagram-label" style="top: 85%; left: 5%;" vid="20">[NOISE_FLOOR_AVG]</div>
+			<div class="diagram-label"
+				style="top: 50%; right: 5%; transform: translateY(-50%) rotate(90deg);" vid="21">
+				OUTPUT_VECTOR -&gt;</div>
+
+
+			<canvas id="oscilloscope" vid="22"></canvas>
+
+
+			<div class="data-readout" vid="23">
+				<div class="data-row" vid="24">
+					<span class="label" vid="25">NOISE_DENSITY</span>
+					<span class="value" id="val-noise" vid="26">0.84</span>
+				</div>
+				<div class="data-row" vid="27">
+					<span class="label" vid="28">SIGNAL_CLARITY</span>
+					<span class="value" id="val-clarity" vid="29">98.2%</span>
+				</div>
+				<div class="data-row" vid="30">
+					<span class="label" vid="31">FREQ_MOD</span>
+					<span class="value" id="val-freq" vid="32">440Hz</span>
+				</div>
+			</div>
+
+
+			<div class="insight-counter-box" vid="33">
+				<span class="counter-label" vid="34">INSIGHTS_EXTRACTED</span>
+				<span class="counter-value" id="counter" vid="35">0000</span>
+			</div>
+		</div>
+
+
+		<div class="meta-footer" vid="36">
+			<span vid="37">[CRD-005] CONTROL ASSET</span>
+			<span vid="38">CONTENT INSTANCES / SLIDE-02</span>
+		</div>
+	</div>
+
+	<script vid="39">
+		const canvas = document.getElementById('oscilloscope');
+		const ctx = canvas.getContext('2d');
+		const counterEl = document.getElementById('counter');
+		const valNoise = document.getElementById('val-noise');
+		const valClarity = document.getElementById('val-clarity');
+
+		let width, height;
+		let time = 0;
+		let insights = 0;
+
+
+		const inputs = [
+			{speed: 0.02, amp: 40, offset: 0, noiseSpeed: 0.05},
+			{speed: 0.03, amp: 30, offset: 100, noiseSpeed: 0.07},
+			{speed: 0.015, amp: 50, offset: 200, noiseSpeed: 0.04},
+			{speed: 0.04, amp: 20, offset: 50, noiseSpeed: 0.08},
+			{speed: 0.025, amp: 35, offset: 150, noiseSpeed: 0.06}
+		];
+
+
+		let pulses = [];
+
+		function resize() {
+			width = canvas.parentElement.clientWidth;
+			height = canvas.parentElement.clientHeight;
+			canvas.width = width;
+			canvas.height = height;
+		}
+
+		window.addEventListener('resize', resize);
+		resize();
+
+
+		function noise(x, t) {
+			return Math.sin(x * 0.01 + t) * Math.cos(x * 0.03 - t);
+		}
+
+		function draw() {
+
+			ctx.clearRect(0, 0, width, height);
+
+
+			const cy = height / 2;
+			const cx = width / 2;
+
+			time += 1;
+
+
+			ctx.lineWidth = 1;
+
+			inputs.forEach((inp, i) => {
+				ctx.beginPath();
+
+				ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + (Math.sin(time * 0.05 + i) * 0.2)})`;
+
+				for (let x = 0; x < cx; x += 5) {
+
+					const progress = x / cx;
+					const mergeFactor = 1 - Math.pow(progress, 3);
+
+					const baseWave = Math.sin(x * inp.speed + time * inp.speed + inp.offset) * inp.amp;
+					const noiseVal = (Math.random() - 0.5) * 30 * mergeFactor;
+
+					const y = cy + (baseWave + noiseVal) * mergeFactor + (i - 2) * 40 * mergeFactor;
+
+					if (x === 0) ctx.moveTo(x, y);
+					else ctx.lineTo(x, y);
+				}
+				ctx.stroke();
+			});
+
+
+			ctx.beginPath();
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = '#33ff77';
+			ctx.moveTo(cx, cy);
+			ctx.lineTo(width, cy);
+			ctx.stroke();
+
+
+
+			if (Math.random() < 0.01) {
+				pulses.push({x: cx, active: true});
+
+				insights++;
+				counterEl.innerText = insights.toString().padStart(4, '0');
+
+
+				valNoise.innerText = (Math.random()).toFixed(2);
+				valClarity.innerText = (90 + Math.random() * 10).toFixed(1) + "%";
+			}
+
+
+			pulses.forEach((p, index) => {
+				if (!p.active) return;
+
+				p.x += 8;
+
+
+				ctx.beginPath();
+				ctx.strokeStyle = '#33ff77';
+				ctx.lineWidth = 2;
+
+
+				const pulseWidth = 40;
+				for (let px = p.x - pulseWidth; px < p.x + pulseWidth; px += 2) {
+					if (px < cx || px > width) continue;
+
+
+					const dist = (px - p.x) / (pulseWidth / 3);
+					const yOffset = -40 * Math.exp(-(dist * dist));
+
+					if (px === p.x - pulseWidth) ctx.moveTo(px, cy);
+					ctx.lineTo(px, cy + yOffset);
+				}
+				ctx.stroke();
+
+
+				ctx.beginPath();
+				ctx.strokeStyle = 'rgba(51, 255, 119, 0.2)';
+				ctx.moveTo(p.x, cy);
+				ctx.lineTo(p.x, cy + 40);
+				ctx.stroke();
+
+
+				ctx.fillStyle = '#33ff77';
+				ctx.font = '10px Courier New';
+				ctx.fillText(`INSIGHT_${insights}`, p.x - 20, cy - 50);
+
+
+				if (p.x > width) {
+					p.active = false;
+					pulses.splice(index, 1);
+				}
+			});
+
+
+			drawSchematics(cx, cy);
+
+			requestAnimationFrame(draw);
+		}
+
+		function drawSchematics(cx, cy) {
+
+			ctx.beginPath();
+			ctx.setLineDash([4, 4]);
+			ctx.strokeStyle = '#444';
+			ctx.lineWidth = 1;
+			ctx.moveTo(cx, 0);
+			ctx.lineTo(cx, height);
+			ctx.stroke();
+			ctx.setLineDash([]);
+
+
+			ctx.beginPath();
+			ctx.strokeStyle = '#33ff77';
+			ctx.lineWidth = 1;
+			ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+			ctx.stroke();
+
+
+			ctx.beginPath();
+			ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+			ctx.arc(cx, cy, 100, 0, Math.PI * 2);
+			ctx.arc(cx, cy, 200, 0, Math.PI * 2);
+			ctx.arc(cx, cy, 300, 0, Math.PI * 2);
+			ctx.stroke();
+		}
+
+		draw();
+
+	</script>
+
+</body>
+
+</html>

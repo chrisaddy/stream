@@ -1,0 +1,14 @@
+.envrc
+.env
+.sesskey
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.claude/
+data/
+/models/
+*.egg-info/
+dist/
+build/

@@ -1,0 +1,92 @@
+"""Onboarding Risk Scoring demo page."""
+
+from fasthtml.common import *
+from stream.app.components import (
+    Card, DataGrid, DataReadout, DiagnosticFrame, Page,
+)
+
+
+def onboarding_page():
+    return Page("Onboarding Risk", "/onboarding",
+        DiagnosticFrame(
+            "ONBOARDING RISK SCORING",
+
+            P("Interactive demo: fill out a mock signup form and get a risk score with explanation.",
+              style="color: var(--fg-dim); margin-bottom: 16px;"),
+
+            Form(
+                Div(
+                    Div(
+                        Label("Email Domain Type", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Select(
+                            Option("Corporate", value="corporate"),
+                            Option("Free (Gmail, etc)", value="free"),
+                            Option("Disposable", value="disposable"),
+                            name="email_domain_type", cls="spark-input",
+                        ),
+                        style="margin-bottom: 12px;",
+                    ),
+                    Div(
+                        Label("Phone Verified", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Select(
+                            Option("Yes", value="1"),
+                            Option("No", value="0"),
+                            name="phone_verified", cls="spark-input",
+                        ),
+                        style="margin-bottom: 12px;",
+                    ),
+                    Div(
+                        Label("Document Verification Score", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Input(type="range", min="0", max="1", step="0.05", value="0.85",
+                              name="doc_score", cls="spark-slider"),
+                        Span(id="doc-score-display", style="color: var(--fg-green);"),
+                        style="margin-bottom: 12px;",
+                    ),
+                    Div(
+                        Label("IP Matches Document Country", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Select(
+                            Option("Yes", value="1"),
+                            Option("No", value="0"),
+                            name="ip_match", cls="spark-input",
+                        ),
+                        style="margin-bottom: 12px;",
+                    ),
+                    Div(
+                        Label("Transactions in First 24h", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Input(type="number", name="tx_velocity", value="2", min="0", max="50",
+                              cls="spark-input"),
+                        style="margin-bottom: 12px;",
+                    ),
+                    Div(
+                        Label("Initial Deposit (USD)", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
+                        Input(type="number", name="initial_deposit", value="500", min="0",
+                              cls="spark-input"),
+                        style="margin-bottom: 12px;",
+                    ),
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
+                ),
+                Button("Assess Risk", cls="spark-btn", type="submit", style="margin-top: 12px;"),
+                **{"hx-post": "/api/v1/onboarding/score", "hx-target": "#onboarding-result"},
+            ),
+
+            Div(id="onboarding-result", style="margin-top: 20px;"),
+
+            status="DEMO",
+            footer_left="[ONB-001] KYC TRIAGE",
+            footer_right="SYNTHETIC_DATA",
+        ),
+
+        # Model comparison
+        DiagnosticFrame(
+            "MODEL COMPARISON",
+
+            Div(
+                id="onboarding-metrics",
+                **{"hx-get": "/api/v1/onboarding/metrics", "hx-trigger": "load", "hx-swap": "innerHTML"},
+            ),
+
+            status="LR vs XGB",
+            footer_left="[ONB-002] CALIBRATION",
+            footer_right="PLATT_SCALING",
+        ),
+    )

@@ -1,0 +1,340 @@
+<html lang="en" vid="0">
+
+<head vid="1">
+	<meta charset="UTF-8" vid="2">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+	<title vid="4">Spark Research Diagnostic // Insights Archive</title>
+	<style vid="5">
+		:root {
+			--bg-color: #080808;
+			--fg-white: #e0e0e0;
+			--fg-green: #33ff77;
+			--fg-dim: #444444;
+			--grid-line: rgba(255, 255, 255, 0.1);
+			--font-mono: 'Courier New', Courier, monospace;
+			--row-hover: rgba(51, 255, 119, 0.05);
+		}
+
+		* {
+			box-sizing: border-box;
+			user-select: none;
+		}
+
+		body {
+			margin: 0;
+			padding: 0;
+			background-color: var(--bg-color);
+			color: var(--fg-white);
+			font-family: var(--font-mono);
+			overflow: hidden;
+			width: 100vw;
+			height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.noise-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+			z-index: 999;
+			opacity: 0.12;
+			background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+		}
+
+		.diagnostic-frame {
+			position: relative;
+			width: 1280px;
+			height: 720px;
+			border: 1px solid var(--fg-dim);
+			display: grid;
+			grid-template-rows: 40px 1fr 40px;
+			background:
+				linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+				linear-gradient(180deg, var(--grid-line) 1px, transparent 1px);
+			background-size: 40px 40px;
+		}
+
+		.meta-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 0 16px;
+			border-bottom: 1px solid var(--fg-dim);
+			font-size: 11px;
+			letter-spacing: 1px;
+			text-transform: uppercase;
+			background: var(--bg-color);
+			z-index: 10;
+		}
+
+		.meta-header span {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.archive-container {
+			position: relative;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			padding: 20px;
+		}
+
+		.archive-header {
+			display: grid;
+			grid-template-columns: 120px 140px 120px 1fr;
+			padding: 10px;
+			border-bottom: 1px solid var(--fg-dim);
+			color: var(--fg-dim);
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 1.5px;
+		}
+
+		.scroll-feed {
+			flex: 1;
+			overflow-y: auto;
+			margin-top: 10px;
+			scrollbar-width: thin;
+			scrollbar-color: var(--fg-dim) transparent;
+		}
+
+		.scroll-feed::-webkit-scrollbar {
+			width: 4px;
+		}
+
+		.scroll-feed::-webkit-scrollbar-thumb {
+			background: var(--fg-dim);
+		}
+
+		.insight-row {
+			display: grid;
+			grid-template-columns: 120px 140px 120px 1fr;
+			padding: 12px 10px;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+			font-size: 12px;
+			align-items: center;
+			transition: background 0.2s ease;
+		}
+
+		.insight-row:hover {
+			background: var(--row-hover);
+			border-left: 2px solid var(--fg-green);
+		}
+
+		.timestamp {
+			color: var(--fg-dim);
+		}
+
+		.id-tag {
+			color: var(--fg-white);
+			font-weight: bold;
+		}
+
+		.clarity {
+			color: var(--fg-green);
+		}
+
+		.decoded-string {
+			color: var(--fg-white);
+			opacity: 0.9;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-style: italic;
+		}
+
+		.meta-footer {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 0 16px;
+			border-top: 1px solid var(--fg-dim);
+			font-size: 10px;
+			color: var(--fg-dim);
+			letter-spacing: 2px;
+			background: var(--bg-color);
+			z-index: 10;
+		}
+
+		.badge {
+			border: 1px solid var(--fg-white);
+			padding: 2px 6px;
+			font-size: 9px;
+			color: var(--fg-white);
+		}
+
+		.sidebar-status {
+			position: absolute;
+			right: 20px;
+			bottom: 60px;
+			width: 200px;
+			border-left: 1px solid var(--fg-dim);
+			padding-left: 15px;
+			font-size: 10px;
+			color: var(--fg-dim);
+		}
+
+		.status-item {
+			margin-bottom: 10px;
+		}
+
+		.status-val {
+			color: var(--fg-green);
+			display: block;
+			font-size: 14px;
+			margin-top: 2px;
+		}
+
+		.crosshair {
+			position: absolute;
+			width: 20px;
+			height: 20px;
+			border-left: 1px solid var(--fg-dim);
+			border-top: 1px solid var(--fg-dim);
+			pointer-events: none;
+		}
+
+		.ch-tl {
+			top: 0;
+			left: 0;
+		}
+
+		.ch-tr {
+			top: 0;
+			right: 0;
+			transform: rotate(90deg);
+		}
+
+		.ch-bl {
+			bottom: 0;
+			left: 0;
+			transform: rotate(-90deg);
+		}
+
+		.ch-br {
+			bottom: 0;
+			right: 0;
+			transform: rotate(180deg);
+		}
+	</style>
+</head>
+
+<body vid="6">
+
+	<div class="noise-overlay" vid="7"></div>
+
+	<div class="diagnostic-frame" vid="8">
+
+		<div class="meta-header" vid="9">
+			<span vid="10">SPARK ARCHIVE <span class="badge" vid="11">LOG_VIEW_02</span></span>
+			<span vid="12">[ DATA_FETCH_SUCCESS ]</span>
+		</div>
+
+		<div class="archive-container" vid="13">
+			<div class="crosshair ch-tl" vid="14"></div>
+			<div class="crosshair ch-tr" vid="15"></div>
+			<div class="crosshair ch-bl" vid="16"></div>
+			<div class="crosshair ch-br" vid="17"></div>
+
+			<div class="archive-header" vid="18">
+				<div vid="19">Timestamp</div>
+				<div vid="20">Insight ID</div>
+				<div vid="21">Clarity</div>
+				<div vid="22">Decoded String Output</div>
+			</div>
+
+			<div class="scroll-feed" id="log-feed" vid="23">
+
+			</div>
+
+			<div class="sidebar-status" vid="24">
+				<div class="status-item" vid="25">
+					ARCHIVE_DEPTH
+					<span class="status-val" vid="26">1,024 MB</span>
+				</div>
+				<div class="status-item" vid="27">
+					ENCRYPTION_LEVEL
+					<span class="status-val" vid="28">AES-256-GCM</span>
+				</div>
+				<div class="status-item" vid="29">
+					SYNC_STATUS
+					<span class="status-val" vid="30">SYNCHRONIZED</span>
+				</div>
+			</div>
+		</div>
+
+		<div class="meta-footer" vid="31">
+			<span vid="32">[ARC-882] HISTORICAL BUFFER</span>
+			<span vid="33">TOTAL_RECORDS: <span id="record-count" vid="34">0</span></span>
+		</div>
+	</div>
+
+	<script vid="35">
+		const feed = document.getElementById('log-feed');
+		const countEl = document.getElementById('record-count');
+
+		const phrases = [
+			"Neural pattern detected in sector 7G",
+			"Atmospheric variance exceeds threshold",
+			"Latent frequency alignment: 0.882",
+			"Sub-surface echo localized",
+			"Recursive signal loop stabilized",
+			"Quantum noise offset corrected",
+			"Biometric signature match: 94%",
+			"Spatial anomaly mapped to grid",
+			"Isotope decay sequence observed",
+			"Temporal shift in localized field",
+			"Synthesized data stream verified",
+			"Carrier wave modulation successful"
+		];
+
+		function generateRow() {
+			const now = new Date();
+			const timeStr = now.getHours().toString().padStart(2, '0') + ":" +
+				now.getMinutes().toString().padStart(2, '0') + ":" +
+				now.getSeconds().toString().padStart(2, '0') + "." +
+				Math.floor(Math.random() * 999).toString().padStart(3, '0');
+
+			const id = "INS_" + Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+			const clarity = (90 + Math.random() * 9).toFixed(2) + "%";
+			const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+			const row = document.createElement('div');
+			row.className = 'insight-row';
+			row.innerHTML = `
+                <div class="timestamp">${timeStr}</div>
+                <div class="id-tag">${id}</div>
+                <div class="clarity">${clarity}</div>
+                <div class="decoded-string">> ${phrase}</div>
+            `;
+			return row;
+		}
+
+
+		for (let i = 0; i < 25; i++) {
+			feed.appendChild(generateRow());
+		}
+		countEl.innerText = feed.children.length;
+
+
+		setInterval(() => {
+			const row = generateRow();
+			feed.insertBefore(row, feed.firstChild);
+			if (feed.children.length > 100) {
+				feed.removeChild(feed.lastChild);
+			}
+			countEl.innerText = feed.children.length;
+		}, 3000);
+	</script>
+</body>
+
+</html>
