@@ -2916,8 +2916,6 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
-    { name = "prefect" },
-    { name = "prefect-aws" },
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "python-fasthtml" },
@@ -2926,16 +2924,26 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "sse-starlette" },
     { name = "structlog" },
-    { name = "torch" },
-    { name = "torch-geometric" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "xgboost" },
+]
+
+[package.optional-dependencies]
+training = [
+    { name = "prefect" },
+    { name = "prefect-aws" },
+    { name = "torch" },
+    { name = "torch-geometric" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "prefect" },
+    { name = "prefect-aws" },
     { name = "pytest" },
+    { name = "torch" },
+    { name = "torch-geometric" },
 ]
 
 [package.metadata]
@@ -2947,8 +2955,8 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "plotly", specifier = ">=6.0.0" },
-    { name = "prefect", specifier = ">=3.6.20" },
-    { name = "prefect-aws", specifier = ">=0.5.0" },
+    { name = "prefect", marker = "extra == 'training'", specifier = ">=3.6.20" },
+    { name = "prefect-aws", marker = "extra == 'training'", specifier = ">=0.5.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.7.0" },
     { name = "python-fasthtml", specifier = ">=0.12.0" },
@@ -2957,16 +2965,21 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "sse-starlette", specifier = ">=2.2.0" },
     { name = "structlog", specifier = ">=24.4.0" },
-    { name = "torch", specifier = ">=2.6.0" },
-    { name = "torch-geometric", specifier = ">=2.7.0" },
+    { name = "torch", marker = "extra == 'training'", specifier = ">=2.6.0" },
+    { name = "torch-geometric", marker = "extra == 'training'", specifier = ">=2.7.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
     { name = "xgboost", specifier = ">=2.1.0,<3.1" },
 ]
+provides-extras = ["training"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "prefect", specifier = ">=3.6.20" },
+    { name = "prefect-aws", specifier = ">=0.5.0" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "torch", specifier = ">=2.6.0" },
+    { name = "torch-geometric", specifier = ">=2.7.0" },
 ]
 
 [[package]]
