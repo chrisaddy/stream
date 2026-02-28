@@ -1,13 +1,12 @@
-"""Deploy Prefect flows to Prefect Cloud.
+"""Deploy and serve Prefect flows.
 
-Creates deployments that run every 2 hours with email notifications.
-Runs are executed by a local worker process (scripts/run_worker.py).
+Creates deployments with Prefect Cloud (cron every 2h) and starts
+an in-process server to execute scheduled runs.
+
+    uv run python scripts/deploy_flows.py
 """
 
-from prefect import deploy
-from prefect.events.actions import RunAutomation
-from prefect.automations import Automation, EventTrigger, Posture
-from prefect.events.schemas.automations import EventTrigger as EventTriggerSchema
+from prefect import serve
 
 from stream.illicit.pipeline import train_illicit_pipeline
 from stream.fees.pipeline import train_fees_pipeline
@@ -16,10 +15,14 @@ from stream.onboarding.pipeline import train_onboarding_pipeline
 
 
 CRON_EVERY_2H = "0 */2 * * *"
+WORK_POOL = "ml-work-pool"
 
 
 if __name__ == "__main__":
-    deploy(
+    print("Registering deployments with Prefect Cloud (every 2 hours)...")
+    print("Starting in-process server to execute runs...\n")
+
+    serve(
         train_illicit_pipeline.to_deployment(
             name="illicit-detection-training",
             cron=CRON_EVERY_2H,
@@ -40,14 +43,4 @@ if __name__ == "__main__":
             cron=CRON_EVERY_2H,
             tags=["ml", "onboarding", "training"],
         ),
-        work_pool_name="stream-worker",
     )
-    print("All flows deployed to Prefect Cloud (every 2 hours).")
-    print()
-    print("IMPORTANT: Set up email notifications in Prefect Cloud UI:")
-    print("  1. Go to https://app.prefect.cloud -> Automations")
-    print("  2. Create automation: 'Email on flow run completion'")
-    print("     Trigger: Flow run enters state 'Completed' OR 'Failed' OR 'Crashed'")
-    print("     Action: Send email to chris.william.addy@gmail.com")
-    print()
-    print("  Or use the setup_automations.py script to configure via API.")

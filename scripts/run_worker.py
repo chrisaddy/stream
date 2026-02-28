@@ -8,5 +8,5 @@ from prefect.workers.process import ProcessWorker
 
 
 if __name__ == "__main__":
-    worker = ProcessWorker(work_pool_name="stream-worker")
+    worker = ProcessWorker(work_pool_name="ml-work-pool")
     worker.start()
