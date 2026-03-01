@@ -71,6 +71,23 @@ def register_api_routes(rt):
             DataReadout("RECOMMENDED_FEE", recommended_fee),
         )
 
+    @rt("/api/v1/home/prediction-count")
+    def prediction_count():
+        from stream.models.predictions import PredictionRecord
+        from sqlalchemy import func
+        from stream.app.components import CounterBox
+
+        count = 0
+        try:
+            db = SessionLocal()
+            try:
+                count = db.query(func.count()).select_from(PredictionRecord).scalar() or 0
+            finally:
+                db.close()
+        except Exception:
+            pass
+        return CounterBox("PREDICTIONS_SERVED", f"{count:04d}")
+
     # === ILLICIT DETECTION ===
 
     @rt("/api/v1/illicit/score", methods=["POST"])
@@ -978,27 +995,30 @@ def register_api_routes(rt):
 
                         yield {"event": "transaction_scored", "data": html}
 
-                        # Persist prediction audit
-                        await write_in_thread(save_prediction, {
-                            "model_name": result["model_name"],
-                            "model_version": result["model_version"],
-                            "input_hash": result["input_hash"],
-                            "risk_score": risk_score,
-                            "risk_label": risk_label,
-                            "threshold_used": RISK_THRESHOLD,
-                            "top_shap_features": result["shap_features"],
-                            "inference_time_ms": result["inference_ms"],
-                        })
-
-                        # Create alert if above threshold
-                        if risk_score > RISK_THRESHOLD:
-                            await write_in_thread(save_alert, {
-                                "tx_id": txid,
+                        # Persist prediction audit (best-effort)
+                        try:
+                            await write_in_thread(save_prediction, {
+                                "model_name": result["model_name"],
+                                "model_version": result["model_version"],
+                                "input_hash": result["input_hash"],
                                 "risk_score": risk_score,
                                 "risk_label": risk_label,
-                                "model_name": result["model_name"],
-                                "explanation": result["shap_features"],
+                                "threshold_used": RISK_THRESHOLD,
+                                "top_shap_features": result["shap_features"],
+                                "inference_time_ms": result["inference_ms"],
                             })
+
+                            # Create alert if above threshold
+                            if risk_score > RISK_THRESHOLD:
+                                await write_in_thread(save_alert, {
+                                    "tx_id": txid,
+                                    "risk_score": risk_score,
+                                    "risk_label": risk_label,
+                                    "model_name": result["model_name"],
+                                    "explanation": result["shap_features"],
+                                })
+                        except Exception:
+                            pass
 
                 except Exception as e:
                     log.debug("Stream error", error=str(e))

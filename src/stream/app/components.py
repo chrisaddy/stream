@@ -23,7 +23,7 @@ def ScanLine():
 def DiagnosticFrame(title: str, *children, status: str = "ACTIVE", footer_left: str = "", footer_right: str = ""):
     return Div(
         Div(
-            Span(title, Span(cls="badge-sm", style="margin-left: 8px;")),
+            Span(title),
             Span(f"[ {status} ]", cls="status"),
             cls="frame-header",
         ),

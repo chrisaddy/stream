@@ -8,8 +8,26 @@ from stream.app.components import (
 
 def home_page():
     return Page("Signal Feed", "/",
+        # Intro
         DiagnosticFrame(
-            "STREAM SIGNAL EXTRACTOR",
+            "STREAM",
+
+            P("Real-time Bitcoin transaction risk scoring. Live transactions are pulled from the mempool, "
+              "scored by ML models for illicit activity signals, and logged to an audit trail. "
+              "High-risk transactions are automatically flagged for compliance review.",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            P("This page streams live Bitcoin mempool data, scores each transaction, "
+              "and displays the results below. The feed updates automatically via SSE.",
+              style="color: var(--fg-subtle); font-size: 11px;"),
+
+            status="OVERVIEW",
+            footer_left="BITCOIN ML COMPLIANCE",
+            footer_right="LIVE_DATA",
+        ),
+
+        DiagnosticFrame(
+            "MEMPOOL STATUS",
 
             # Oscilloscope canvas
             Canvas(id="oscilloscope", cls="oscilloscope"),
@@ -29,6 +47,11 @@ def home_page():
         DiagnosticFrame(
             "TRANSACTION SCORING FEED",
 
+            P("Live transactions from the Bitcoin mempool, scored in real-time. "
+              "Rows flash red when risk exceeds the 0.7 threshold. "
+              "Each prediction is logged to the audit trail.",
+              style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
             FeedHeader(),
             Div(
                 id="score-feed",
@@ -43,7 +66,8 @@ def home_page():
             ),
 
             Div(
-                CounterBox("PREDICTIONS_SERVED", "0000"),
+                id="prediction-counter",
+                **{"hx-get": "/api/v1/home/prediction-count", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
                 style="text-align: center; margin-top: 20px;",
             ),
 
