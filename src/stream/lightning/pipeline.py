@@ -1,5 +1,8 @@
 """Prefect flow for Lightning Network analysis."""
 
+import json
+import os
+
 import httpx
 import structlog
 from prefect import flow, task
@@ -42,6 +45,24 @@ def compute_features(G):
     features = compute_all_features(G)
     log.info("Features computed", count=len(features))
     return features
+
+
+@task(name="save-lightning-features")
+def save_features(features: list[dict], name: str = "lightning-lgbm"):
+    """Save computed node features to R2/local for live inference."""
+    data = json.dumps(features, default=str).encode()
+    key = f"models/{name}/features.json"
+    try:
+        from io import BytesIO
+        from prefect_aws.s3 import S3Bucket
+        s3 = S3Bucket.load("model-store")
+        s3.upload_from_file_object(BytesIO(data), key)
+        log.info("Lightning features saved to R2", count=len(features))
+    except Exception as e:
+        log.warning("R2 features upload failed, saving locally", error=str(e))
+        os.makedirs(f"models/{name}", exist_ok=True)
+        with open(f"models/{name}/features.json", "wb") as f:
+            f.write(data)
 
 
 @task(name="train-lightning-model")
@@ -175,6 +196,7 @@ async def train_lightning_pipeline():
         return
     G = build_lightning_graph(nodes)
     features = compute_features(G)
+    save_features(features)
     model = train_model(features)
     metrics = evaluate_model(model, features)
     save_model(model)

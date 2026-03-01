@@ -14,8 +14,10 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge,
 )
-from stream.app.models import get_model, get_model_card
+from stream.app.models import get_model, get_model_card, get_cached_features
 from stream.db import write_in_thread, save_prediction, save_alert, SessionLocal
+from stream.fees.inference import predict_fee
+from stream.onboarding.inference import predict_risk
 from stream.services import score_transaction, RISK_THRESHOLD
 
 log = structlog.get_logger()
@@ -124,20 +126,28 @@ def register_api_routes(rt):
 
     @rt("/api/v1/fees/compare")
     async def fees_compare():
-        """Compare ML vs Bitcoin Core fees."""
+        """Compare ML vs mempool.space fees."""
         try:
+            from stream.fees.collector import collect_snapshot
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get("https://mempool.space/api/v1/fees/recommended")
                 fees = resp.json()
+                snapshot = await collect_snapshot(client)
 
-            # Simulated ML predictions (would use real model in production)
-            ml_adj = lambda x: max(1, int(x * (0.9 + np.random.random() * 0.2)))
+            model_data = get_model("fee-lgbm")
+            ml_fee = None
+            if model_data is not None and snapshot is not None:
+                ml_fee = predict_fee(model_data, snapshot)
+
+            # Next Block row uses ML model if available
+            next_block_ml = f"{ml_fee} sat/vB" if ml_fee else f"{fees['fastestFee']} sat/vB"
+            diff = f"{ml_fee - fees['fastestFee']:+d}" if ml_fee else "-"
 
             return (
-                Tr(Td("Next Block"), Td(f"{ml_adj(fees['fastestFee'])} sat/vB"), Td(f"{fees['fastestFee']} sat/vB"), Td("-")),
-                Tr(Td("30 min"), Td(f"{ml_adj(fees['halfHourFee'])} sat/vB"), Td(f"{fees['halfHourFee']} sat/vB"), Td("-")),
-                Tr(Td("1 hour"), Td(f"{ml_adj(fees['hourFee'])} sat/vB"), Td(f"{fees['hourFee']} sat/vB"), Td("-")),
-                Tr(Td("Economy"), Td(f"{ml_adj(fees['economyFee'])} sat/vB"), Td(f"{fees['economyFee']} sat/vB"), Td("-")),
+                Tr(Td("Next Block"), Td(next_block_ml), Td(f"{fees['fastestFee']} sat/vB"), Td(diff)),
+                Tr(Td("30 min"), Td("-"), Td(f"{fees['halfHourFee']} sat/vB"), Td("-")),
+                Tr(Td("1 hour"), Td("-"), Td(f"{fees['hourFee']} sat/vB"), Td("-")),
+                Tr(Td("Economy"), Td("-"), Td(f"{fees['economyFee']} sat/vB"), Td("-")),
             )
         except Exception:
             return Tr(Td("Error fetching fees", colspan="4"))
@@ -160,17 +170,41 @@ def register_api_routes(rt):
     @rt("/api/v1/fees/estimate")
     async def fee_estimate(request):
         target = int(request.query_params.get("target_blocks", "6"))
-        model = get_model("fee-lgbm")
+        model_data = get_model("fee-lgbm")
 
         try:
+            from stream.fees.collector import collect_snapshot
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get("https://mempool.space/api/v1/fees/recommended")
                 fees = resp.json()
 
+                # Collect a full snapshot for ML prediction
+                snapshot = await collect_snapshot(client)
+
             fee_map = {1: "fastestFee", 3: "halfHourFee", 6: "hourFee", 12: "economyFee", 24: "minimumFee"}
             mempool_fee = fees.get(fee_map.get(target, "hourFee"), 10)
 
-            return {"target_blocks": target, "recommended_fee": mempool_fee, "model_version": "live-mempool", "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+            result = {
+                "target_blocks": target,
+                "mempool_fee": mempool_fee,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
+
+            # ML prediction
+            if model_data is not None and snapshot is not None:
+                ml_fee = predict_fee(model_data, snapshot)
+                if ml_fee is not None:
+                    result["ml_fee"] = ml_fee
+                    result["model_version"] = "fee-lgbm"
+                    result["recommended_fee"] = ml_fee
+                else:
+                    result["recommended_fee"] = mempool_fee
+                    result["model_version"] = "live-mempool"
+            else:
+                result["recommended_fee"] = mempool_fee
+                result["model_version"] = "live-mempool"
+
+            return result
         except Exception:
             return {"target_blocks": target, "recommended_fee": 10, "model_version": "fallback"}
 
@@ -199,16 +233,46 @@ def register_api_routes(rt):
     @rt("/api/v1/lightning/top-nodes")
     async def top_nodes():
         try:
+            from stream.lightning.model import FEATURE_COLS
+
+            model = get_model("lightning-lgbm")
+            cached_features = get_cached_features("lightning")
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get("https://mempool.space/api/v1/lightning/nodes/rankings/connectivity")
                 nodes = resp.json()[:10]
 
+            # Build pubkey lookup from cached features
+            features_by_pubkey = {}
+            if cached_features:
+                for f in cached_features:
+                    pk = f.get("pubkey", "")
+                    if pk:
+                        features_by_pubkey[pk] = f
+
             rows = []
             for i, n in enumerate(nodes):
                 alias = n.get("alias", "Unknown")[:20]
+                pubkey = n.get("publicKey", "")
                 channels = n.get("channels", n.get("active_channel_count", 0))
                 capacity = n.get("capacity", 0) / 100_000_000
-                score = min(channels / 1000, 1.0) * 0.5 + min(capacity / 500, 1.0) * 0.5
+
+                # Try ML model prediction if we have cached features
+                score = None
+                if model is not None and pubkey in features_by_pubkey:
+                    try:
+                        feat = features_by_pubkey[pubkey]
+                        X = np.array([[feat.get(c, 0) for c in FEATURE_COLS]])
+                        pred = float(model.predict(X)[0])
+                        # Normalize prediction to 0-1 score
+                        score = min(pred / 10_000_000_000, 1.0)  # Normalize by 100 BTC in sats
+                    except Exception:
+                        pass
+
+                # Fallback to heuristic formula
+                if score is None:
+                    score = min(channels / 1000, 1.0) * 0.5 + min(capacity / 500, 1.0) * 0.5
+
                 rows.append(Tr(
                     Td(str(i + 1)),
                     Td(alias),
@@ -222,6 +286,8 @@ def register_api_routes(rt):
 
     @rt("/api/v1/lightning/evaluate", methods=["POST"])
     async def evaluate_node(request):
+        from stream.lightning.model import FEATURE_COLS
+
         form = await request.form()
         pubkey = form.get("pubkey", "").strip()
         if not pubkey:
@@ -235,7 +301,27 @@ def register_api_routes(rt):
             alias = node.get("alias", "Unknown")
             channels = node.get("active_channel_count", 0)
             capacity = node.get("capacity", 0) / 100_000_000
-            score = min(channels / 1000, 1.0) * 0.5 + min(capacity / 500, 1.0) * 0.5
+
+            model = get_model("lightning-lgbm")
+            cached_features = get_cached_features("lightning")
+            score = None
+            scoring_source = "HEURISTIC"
+
+            # Check cached features for this pubkey
+            if model is not None and cached_features:
+                feat = next((f for f in cached_features if f.get("pubkey") == pubkey), None)
+                if feat is not None:
+                    try:
+                        X = np.array([[feat.get(c, 0) for c in FEATURE_COLS]])
+                        pred = float(model.predict(X)[0])
+                        score = min(pred / 10_000_000_000, 1.0)
+                        scoring_source = "ML-MODEL"
+                    except Exception:
+                        pass
+
+            # Fallback to heuristic
+            if score is None:
+                score = min(channels / 1000, 1.0) * 0.5 + min(capacity / 500, 1.0) * 0.5
 
             return Div(
                 DataGrid(
@@ -243,8 +329,9 @@ def register_api_routes(rt):
                     DataReadout("CHANNELS", str(channels)),
                     DataReadout("CAPACITY", f"{capacity:.1f} BTC"),
                     DataReadout("ROUTING_SCORE", f"{score:.3f}", highlight=True),
+                    DataReadout("SOURCE", scoring_source),
                 ),
-                P(f"Node {alias} has {channels} channels with {capacity:.1f} BTC capacity. Routing score: {score:.3f}",
+                P(f"Node {alias} has {channels} channels with {capacity:.1f} BTC capacity. Routing score: {score:.3f} ({scoring_source})",
                   style="margin-top: 12px; color: var(--fg-dim);"),
             )
         except Exception as e:
@@ -264,7 +351,44 @@ def register_api_routes(rt):
         tx_vel = int(form.get("tx_velocity", "2"))
         deposit = float(form.get("initial_deposit", "500"))
 
-        # Simple risk calculation (matches training data generation logic)
+        # Try ML model first
+        model_data = get_model("onboarding-xgb")
+        ml_result = None
+        if model_data is not None:
+            form_values = {
+                "email_domain_type": email_type,
+                "phone_verified": phone,
+                "doc_score": doc_score,
+                "ip_match": ip_match,
+                "tx_velocity": tx_vel,
+                "initial_deposit": deposit,
+            }
+            ml_result = predict_risk(model_data, form_values)
+
+        if ml_result is not None:
+            label = ml_result["risk_label"]
+            action = ml_result["action"]
+            probas = ml_result["class_probabilities"]
+            source = ml_result["source"]
+
+            # Use the max probability as the risk indicator
+            risk_prob = max(probas.get("high_risk", 0), probas.get("blocked", 0))
+
+            proba_text = " | ".join(f"{k}: {v:.3f}" for k, v in probas.items())
+
+            return Div(
+                DataGrid(
+                    DataReadout("RISK_TIER", label.upper()),
+                    DataReadout("RECOMMENDED_ACTION", action.upper().replace("_", " ")),
+                    DataReadout("SOURCE", source),
+                ),
+                P(f"Class probabilities: {proba_text}",
+                  style="color: var(--fg-dim); margin-top: 8px; font-size: 11px;"),
+                P(f"Key factors: email_domain={email_type}, doc_verification={doc_score:.2f}, ip_match={'yes' if ip_match else 'no'}",
+                  style="color: var(--fg-dim); margin-top: 4px;"),
+            )
+
+        # Heuristic fallback
         risk_score = 0.0
         risk_score += (email_type == "disposable") * 2
         risk_score += (1 - phone) * 1.5
@@ -272,18 +396,16 @@ def register_api_routes(rt):
         risk_score += (1 - ip_match) * 2.5
         risk_score += min(tx_vel / 10, 2)
 
-        # Normalize to 0-1
         risk_prob = min(risk_score / 10, 1.0)
         label = "low_risk" if risk_prob < 0.3 else "medium_risk" if risk_prob < 0.5 else "high_risk" if risk_prob < 0.7 else "blocked"
         action = "auto_approve" if label == "low_risk" else "manual_review" if label in ("medium_risk", "high_risk") else "block"
-
-        risk_cls = "risk-low" if risk_prob < 0.3 else "risk-medium" if risk_prob < 0.6 else "risk-high"
 
         return Div(
             DataGrid(
                 DataReadout("RISK_SCORE", f"{risk_prob:.2f}", highlight=risk_prob < 0.3, variant="danger" if risk_prob > 0.6 else ""),
                 DataReadout("RISK_TIER", label.upper()),
                 DataReadout("RECOMMENDED_ACTION", action.upper().replace("_", " ")),
+                DataReadout("SOURCE", "HEURISTIC"),
             ),
             P(f"Key factors: email_domain={email_type}, doc_verification={doc_score:.2f}, ip_match={'yes' if ip_match else 'no'}",
               style="color: var(--fg-dim); margin-top: 8px;"),
@@ -291,17 +413,38 @@ def register_api_routes(rt):
 
     @rt("/api/v1/onboarding/metrics")
     def onboarding_metrics():
+        card = get_model_card("onboarding-xgb")
+        if card:
+            metrics = card.get("metrics", {})
+            lr = metrics.get("logistic_regression", {})
+            xgb = metrics.get("calibrated_xgboost", {})
+            if lr and xgb:
+                return Div(
+                    Table(
+                        Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
+                        Tbody(
+                            Tr(Td("Accuracy"), Td(f"{lr.get('accuracy', 0):.4f}"), Td(f"{xgb.get('accuracy', 0):.4f}", style="color: var(--fg-green);")),
+                            Tr(Td("F1 (macro)"), Td(f"{lr.get('f1_macro', 0):.4f}"), Td(f"{xgb.get('f1_macro', 0):.4f}", style="color: var(--fg-green);")),
+                            Tr(Td("Log Loss"), Td(f"{lr.get('log_loss', 0):.4f}"), Td(f"{xgb.get('log_loss', 0):.4f}", style="color: var(--fg-green);")),
+                        ),
+                        cls="spark-table",
+                    ),
+                    P("Metrics from most recent training run.",
+                      style="color: var(--fg-dim); font-size: 10px; margin-top: 8px;"),
+                )
+
+        # Hardcoded fallback
         return Div(
             Table(
                 Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
                 Tbody(
-                    Tr(Td("Accuracy"), Td("0.782"), Td("0.845", style="color: var(--fg-green);")),
-                    Tr(Td("F1 (macro)"), Td("0.691"), Td("0.773", style="color: var(--fg-green);")),
-                    Tr(Td("Log Loss"), Td("0.612"), Td("0.489", style="color: var(--fg-green);")),
+                    Tr(Td("Accuracy"), Td("—"), Td("—")),
+                    Tr(Td("F1 (macro)"), Td("—"), Td("—")),
+                    Tr(Td("Log Loss"), Td("—"), Td("—")),
                 ),
                 cls="spark-table",
             ),
-            P("Logistic regression provides an interpretable baseline. Calibrated XGBoost improves accuracy while maintaining well-calibrated probabilities via Platt scaling.",
+            P("No model card available. Run the onboarding training pipeline to see live metrics.",
               style="color: var(--fg-dim); font-size: 10px; margin-top: 8px;"),
         )
 

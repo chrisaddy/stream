@@ -59,12 +59,17 @@ def train_multi_target_models(
     return models
 
 
-def serialize_fee_model(model: lgb.LGBMRegressor) -> bytes:
+def serialize_fee_model(model: lgb.LGBMRegressor, feature_cols: list[str] | None = None) -> bytes:
     buf = BytesIO()
-    pickle.dump(model, buf)
+    pickle.dump({"model": model, "feature_cols": feature_cols}, buf)
     return buf.getvalue()
 
 
-def deserialize_fee_model(data: bytes) -> lgb.LGBMRegressor:
+def deserialize_fee_model(data: bytes):
+    """Deserialize fee model. Returns dict with model+feature_cols (new) or bare model (old)."""
     buf = BytesIO(data)
-    return pickle.load(buf)
+    obj = pickle.load(buf)
+    # Backward compat: old pickles are bare LGBMRegressor
+    if isinstance(obj, dict):
+        return obj
+    return {"model": obj, "feature_cols": None}

@@ -1,5 +1,7 @@
 """Prefect flow for fee estimation training."""
 
+import json
+import os
 import pickle
 import structlog
 from prefect import flow, task
@@ -19,22 +21,75 @@ from stream.model_card import (
 
 log = structlog.get_logger()
 
+SNAPSHOT_PATH = "models/fee-lgbm/snapshots.json"
+MAX_CACHED_SNAPSHOTS = 5000
+
+
+@task(name="load-cached-snapshots")
+def load_cached_snapshots() -> list[dict]:
+    """Load previously cached snapshots from R2 or local."""
+    # Try R2
+    try:
+        import boto3
+        from stream.config import settings
+        if settings.R2_ENDPOINT_URL:
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=settings.R2_ENDPOINT_URL,
+                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+            )
+            resp = s3.get_object(Bucket=settings.R2_BUCKET_NAME, Key=SNAPSHOT_PATH)
+            snapshots = json.loads(resp["Body"].read())
+            log.info("Loaded cached snapshots from R2", count=len(snapshots))
+            return snapshots
+    except Exception as e:
+        log.debug("R2 snapshot load failed", error=str(e))
+
+    # Local fallback
+    if os.path.exists(SNAPSHOT_PATH):
+        with open(SNAPSHOT_PATH) as f:
+            snapshots = json.load(f)
+        log.info("Loaded cached snapshots from local", count=len(snapshots))
+        return snapshots
+
+    return []
+
+
+@task(name="save-snapshots")
+def save_snapshots(snapshots: list[dict]):
+    """Persist snapshots to R2/local, capped at MAX_CACHED_SNAPSHOTS."""
+    snapshots = snapshots[-MAX_CACHED_SNAPSHOTS:]
+    data = json.dumps(snapshots, default=str).encode()
+
+    try:
+        from io import BytesIO
+        from prefect_aws.s3 import S3Bucket
+        s3 = S3Bucket.load("model-store")
+        s3.upload_from_file_object(BytesIO(data), SNAPSHOT_PATH)
+        log.info("Snapshots saved to R2", count=len(snapshots))
+    except Exception as e:
+        log.warning("R2 snapshot upload failed, saving locally", error=str(e))
+        os.makedirs(os.path.dirname(SNAPSHOT_PATH), exist_ok=True)
+        with open(SNAPSHOT_PATH, "wb") as f:
+            f.write(data)
+
 
 @task(name="collect-mempool-data")
 async def collect_data(n_snapshots: int = 100):
-    """Collect mempool snapshots (or load cached)."""
+    """Collect new mempool snapshots."""
     import httpx
     import asyncio
 
     snapshots = []
     async with httpx.AsyncClient(timeout=30.0) as client:
-        for i in range(min(n_snapshots, 10)):  # Quick collection for demo
+        for i in range(n_snapshots):
             snapshot = await collect_snapshot(client)
             if snapshot:
                 snapshots.append(snapshot)
             await asyncio.sleep(2)
 
-    log.info("Collected snapshots", count=len(snapshots))
+    log.info("Collected new snapshots", count=len(snapshots))
     return snapshots
 
 
@@ -89,22 +144,21 @@ def evaluate_model(model, X_features, y_target, feature_cols):
 
 
 @task(name="save-fee-model")
-def save_model(model, name: str = "fee-lgbm"):
+def save_model(model, feature_cols=None, name: str = "fee-lgbm"):
     if model is None:
         return
     try:
         from io import BytesIO
         from prefect_aws.s3 import S3Bucket
         s3 = S3Bucket.load("model-store")
-        model_bytes = serialize_fee_model(model)
+        model_bytes = serialize_fee_model(model, feature_cols)
         s3.upload_from_file_object(BytesIO(model_bytes), f"models/{name}/latest.pkl")
         log.info("Fee model saved to R2")
     except Exception as e:
         log.warning("R2 upload failed, saving locally", error=str(e))
-        import os
         os.makedirs(f"models/{name}", exist_ok=True)
         with open(f"models/{name}/latest.pkl", "wb") as f:
-            f.write(serialize_fee_model(model))
+            f.write(serialize_fee_model(model, feature_cols))
 
 
 @task(name="build-fee-model-card")
@@ -183,14 +237,20 @@ def create_artifacts(metrics, card):
 
 @flow(name="fee-estimation-training")
 async def train_fees_pipeline():
-    snapshots = await collect_data()
+    cached = load_cached_snapshots()
+    new_snapshots = await collect_data()
+
+    snapshots = cached + new_snapshots
     if not snapshots:
         log.error("No snapshots collected")
         return
+
+    save_snapshots(snapshots)
+
     X, y = featurize(snapshots)
     model, feature_cols, X_features, y_target = train_model(X, y)
     metrics = evaluate_model(model, X_features, y_target, feature_cols)
-    save_model(model)
+    save_model(model, feature_cols)
     card = build_card(model, metrics, feature_cols, X_features, y_target)
     create_artifacts(metrics, card)
 

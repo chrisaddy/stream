@@ -1,4 +1,4 @@
-set dotenv-load
+set dotenv-load := true
 
 default:
     @just --list
@@ -10,7 +10,7 @@ setup:
 
 # Run dashboard in dev mode with hot reload
 dev:
-    uv run uvicorn stream.app.main:app --host 0.0.0.0 --port 5000 --reload
+    uv run uvicorn stream.app.main:app --host 0.0.0.0 --port 5001 --reload
 
 # Run test suite
 test:

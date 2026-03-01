@@ -3,7 +3,7 @@
 import structlog
 from fasthtml.common import *
 
-from stream.app.models import load_all_models, load_model_cards
+from stream.app.models import load_all_models, load_lightning_features, load_model_cards
 from stream.db import engine
 from stream.models.base import Base
 from stream.models.predictions import PredictionRecord  # noqa: F401 — register table
@@ -49,12 +49,18 @@ async def on_startup():
     except Exception as e:
         log.warning("Model card loading failed on startup", error=str(e))
 
+    # 4. Load lightning features cache
+    try:
+        load_lightning_features()
+    except Exception as e:
+        log.warning("Lightning features loading failed on startup", error=str(e))
+
 
 # Create FastHTML app with static file serving
 app, rt = fast_app(
     static_path="src/stream/app/static",
     hdrs=[
-        Link(rel="stylesheet", href="/static/style.css"),
+        Link(rel="stylesheet", href="/style.css"),
     ],
     on_startup=[on_startup],
 )

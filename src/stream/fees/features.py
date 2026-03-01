@@ -3,7 +3,6 @@
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 
 
 def extract_features(snapshot: dict) -> dict:
@@ -68,17 +67,21 @@ def extract_features(snapshot: dict) -> dict:
     return features
 
 
-def build_feature_matrix(snapshots: list[dict]) -> pd.DataFrame:
+def build_feature_matrix(snapshots: list[dict]):
     """Build feature matrix from list of snapshots."""
+    import pandas as pd
+
     rows = [extract_features(s) for s in snapshots]
     return pd.DataFrame(rows)
 
 
-def build_targets(snapshots: list[dict]) -> pd.DataFrame:
+def build_targets(snapshots: list[dict]):
     """Extract fee rate targets from snapshots.
 
     Targets: recommended fee rates for different confirmation targets.
     """
+    import pandas as pd
+
     targets = []
     for s in snapshots:
         fees = s.get("recommended_fees", {})

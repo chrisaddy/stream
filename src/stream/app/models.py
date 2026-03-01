@@ -1,5 +1,6 @@
 """Model loading from R2 or local storage."""
 
+import json
 import os
 import pickle
 import structlog
@@ -9,6 +10,7 @@ log = structlog.get_logger()
 # Module-level model cache
 _models: dict = {}
 _model_cards: dict = {}
+_features_cache: dict = {}
 
 
 def _load_from_r2(path: str) -> bytes | None:
@@ -105,3 +107,36 @@ def get_model_card(name: str) -> dict | None:
 def get_all_model_cards() -> dict:
     """Get all cached model cards."""
     return _model_cards
+
+
+def load_lightning_features():
+    """Load cached lightning node features from R2 or local."""
+    key = "models/lightning-lgbm/features.json"
+
+    # Try R2
+    try:
+        data = _load_from_r2(key)
+        if data:
+            features = json.loads(data)
+            _features_cache["lightning"] = features
+            log.info("Lightning features loaded from R2", count=len(features))
+            return features
+    except Exception as e:
+        log.debug("R2 lightning features load failed", error=str(e))
+
+    # Local fallback
+    local_path = key
+    if os.path.exists(local_path):
+        with open(local_path) as f:
+            features = json.load(f)
+        _features_cache["lightning"] = features
+        log.info("Lightning features loaded from local", count=len(features))
+        return features
+
+    log.debug("No lightning features found")
+    return None
+
+
+def get_cached_features(name: str = "lightning") -> list[dict] | None:
+    """Get cached node features."""
+    return _features_cache.get(name)
