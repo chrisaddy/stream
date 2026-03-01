@@ -18,16 +18,34 @@ import structlog
 
 log = structlog.get_logger()
 
-_risk_threshold = 0.7
+_risk_threshold: float | None = None
+
+
+def _load_threshold_from_db() -> float:
+    """Load threshold from Postgres, defaulting to 0.7."""
+    try:
+        from stream.db import load_setting
+        val = load_setting("risk_threshold", "0.7")
+        return float(val)
+    except Exception:
+        return 0.7
 
 
 def get_risk_threshold() -> float:
+    global _risk_threshold
+    if _risk_threshold is None:
+        _risk_threshold = _load_threshold_from_db()
     return _risk_threshold
 
 
 def set_risk_threshold(value: float):
     global _risk_threshold
     _risk_threshold = max(0.05, min(0.9, value))
+    try:
+        from stream.db import save_setting
+        save_setting("risk_threshold", str(_risk_threshold))
+    except Exception as e:
+        log.warning("Failed to persist threshold", error=str(e))
 
 
 def _heuristic_risk_score(fee_rate: float, vsize: int, fee: int) -> float:
@@ -95,20 +113,45 @@ def _heuristic_explanation(fee_rate: float, vsize: int, fee: int) -> list[dict]:
     return factors
 
 
+def _try_learned_model(fee_rate: float, vsize: int, fee: int) -> float | None:
+    """Attempt scoring with the learned feedback model. Returns score or None."""
+    try:
+        from stream.feedback.pipeline import get_learned_model
+        model = get_learned_model()
+        if model is None:
+            return None
+        X = np.array([[fee_rate, vsize, fee]])
+        proba = model.predict_proba(X)[0]
+        # Class 1 = true_positive (illicit), return its probability
+        return float(proba[1]) if len(proba) > 1 else float(proba[0])
+    except Exception:
+        return None
+
+
 async def score_transaction(
     txid: str, vsize: int, fee: int
 ) -> dict:
-    """Score a live transaction using honest heuristic scoring.
+    """Score a live transaction — prefers learned model, falls back to heuristic.
 
-    The Elliptic XGBoost model requires 166 graph features we don't have
-    for live transactions. This uses transparent heuristics on the 3 features
-    we do have: vsize, fee, and fee_rate.
+    If a feedback-trained model exists (from analyst reviews), use it.
+    Otherwise fall back to the transparent sigmoid-based heuristic.
     """
     start = time.time()
 
     fee_rate = fee / max(vsize, 1)
-    risk_score = _heuristic_risk_score(fee_rate, vsize, fee)
-    shap_features = _heuristic_explanation(fee_rate, vsize, fee)
+
+    # Try learned model first
+    learned_score = _try_learned_model(fee_rate, vsize, fee)
+    if learned_score is not None:
+        risk_score = round(learned_score, 4)
+        model_name = "live-heuristic-v2"
+        model_version = "v2.0"
+        shap_features = _heuristic_explanation(fee_rate, vsize, fee)
+    else:
+        risk_score = _heuristic_risk_score(fee_rate, vsize, fee)
+        model_name = "live-heuristic"
+        model_version = "v1.0"
+        shap_features = _heuristic_explanation(fee_rate, vsize, fee)
 
     inference_ms = (time.time() - start) * 1000
     threshold = get_risk_threshold()
@@ -118,12 +161,19 @@ async def score_transaction(
         json.dumps({"txid": txid, "vsize": vsize, "fee": fee}).encode()
     ).hexdigest()
 
+    # Feed drift monitor
+    try:
+        from stream.drift.monitor import record_score
+        record_score(risk_score)
+    except Exception:
+        pass
+
     return {
         "risk_score": risk_score,
         "risk_label": risk_label,
         "inference_ms": round(inference_ms, 2),
-        "model_name": "live-heuristic",
-        "model_version": "v1.0",
+        "model_name": model_name,
+        "model_version": model_version,
         "input_hash": input_hash,
         "shap_features": shap_features,
         "is_demo": False,

@@ -8,6 +8,11 @@ setup:
     uv sync
     docker compose up -d
 
+# Start full local dev environment (Postgres + Redis + app with hot reload)
+local:
+    docker compose up -d
+    uv run uvicorn stream.app.main:app --host 0.0.0.0 --port 5001 --reload
+
 # Run dashboard in dev mode with hot reload
 dev:
     uv run uvicorn stream.app.main:app --host 0.0.0.0 --port 5001 --reload

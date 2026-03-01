@@ -670,6 +670,13 @@ def register_api_routes(rt):
                 style="margin-top: 16px; padding: 12px; border: 1px solid var(--fg-dim); text-align: center;",
             )
 
+            investigate_btn = Div(
+                Button("Investigate with AI Agent", cls="spark-btn agent-btn",
+                       **{"hx-post": f"/api/v1/agent/investigate/{tx_id}", "hx-target": "#investigation-detail",
+                          "hx-swap": "innerHTML"}),
+                style="margin-top: 12px;",
+            )
+
             return Div(
                 H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
                 DataGrid(
@@ -685,6 +692,8 @@ def register_api_routes(rt):
                       style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;"),
                 ),
                 review_buttons,
+                investigate_btn,
+                Div(id="investigation-detail"),
             )
 
         # Demo fallback
@@ -718,6 +727,13 @@ def register_api_routes(rt):
                           "hx-vals": '{"verdict":"false_positive"}'}),
                 style="margin-top: 16px;",
             ),
+            Div(
+                Button("Investigate with AI Agent", cls="spark-btn agent-btn",
+                       **{"hx-post": f"/api/v1/agent/investigate/{tx_id}", "hx-target": "#investigation-detail",
+                          "hx-swap": "innerHTML"}),
+                style="margin-top: 12px;",
+            ),
+            Div(id="investigation-detail"),
         )
 
     # === SETTINGS ===
@@ -994,6 +1010,253 @@ def register_api_routes(rt):
             cls="spark-table",
         )
 
+    # === FEEDBACK / RETRAINING ===
+
+    @rt("/api/v1/feedback/stats")
+    def feedback_stats():
+        from stream.models.reviews import ReviewRecord
+        from sqlalchemy import func
+
+        try:
+            db = SessionLocal()
+            try:
+                total = db.query(func.count()).select_from(ReviewRecord).scalar() or 0
+                tp = db.query(func.count()).select_from(ReviewRecord).filter(ReviewRecord.verdict == "true_positive").scalar() or 0
+                fp = db.query(func.count()).select_from(ReviewRecord).filter(ReviewRecord.verdict == "false_positive").scalar() or 0
+            finally:
+                db.close()
+        except Exception:
+            total, tp, fp = 0, 0, 0
+
+        from stream.feedback.pipeline import get_retrain_status, get_model_metadata
+        status = get_retrain_status()
+        meta = get_model_metadata()
+
+        # Model lineage strip
+        lineage = "heuristic-v1.0"
+        if meta:
+            lineage += f" → live-heuristic-v2.0 ({meta['n_labels']} labels)"
+
+        status_color = {"IDLE": "var(--fg-dim)", "TRAINING": "var(--fg-orange)", "COMPLETE": "var(--fg-green)", "ERROR": "var(--fg-red)"}.get(status["state"], "var(--fg-dim)")
+
+        metrics_section = []
+        if status["metrics"]:
+            m = status["metrics"]
+            metrics_section = [
+                H4("RETRAIN RESULTS", style="color: var(--fg-dim); font-size: 10px; margin-top: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                DataGrid(
+                    DataReadout("ACCURACY", f"{m['accuracy']:.1%}"),
+                    DataReadout("METHOD", m["method"]),
+                    DataReadout("TRAIN_SIZE", str(m["n_train"])),
+                    DataReadout("TEST_SIZE", str(m["n_test"])),
+                ),
+            ]
+
+        error_section = []
+        if status["state"] == "ERROR" and status.get("error"):
+            error_section = [P(f"Error: {status['error']}", style="color: var(--fg-red); font-size: 11px; margin-top: 8px;")]
+
+        return Div(
+            DataGrid(
+                DataReadout("TOTAL REVIEWS", str(total)),
+                DataReadout("TRUE POSITIVE", str(tp), variant="danger" if tp > 0 else ""),
+                DataReadout("FALSE POSITIVE", str(fp)),
+            ),
+            Div(
+                Span("RETRAIN STATUS: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                Span(status["state"], style=f"color: {status_color}; font-weight: bold; font-size: 12px;"),
+                style="margin-top: 12px;",
+            ),
+            Div(
+                Span("MODEL LINEAGE: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                Span(lineage, style="color: var(--fg-green); font-size: 11px;"),
+                style="margin-top: 8px;",
+            ),
+            *metrics_section,
+            *error_section,
+            Div(
+                Button("RETRAIN NOW", cls="spark-btn",
+                       style="margin-top: 16px;",
+                       **{"hx-post": "/api/v1/feedback/retrain", "hx-target": "#feedback-panel", "hx-swap": "innerHTML"}),
+                style="text-align: center;" if total >= 3 else "text-align: center; opacity: 0.5;",
+            ) if total >= 3 else Div(
+                P(f"Need at least 3 reviews to retrain (have {total}). Review more alerts above.",
+                  style="color: var(--fg-dim); font-size: 11px; margin-top: 12px; text-align: center;"),
+            ),
+        )
+
+    @rt("/api/v1/feedback/retrain", methods=["POST"])
+    async def trigger_retrain():
+        import asyncio
+        from stream.feedback.pipeline import run_retraining, get_retrain_status
+
+        status = get_retrain_status()
+        if status["state"] == "TRAINING":
+            return Div(P("Retraining already in progress...", style="color: var(--fg-orange);"))
+
+        # Run retraining in a thread to avoid blocking
+        result = await asyncio.to_thread(run_retraining)
+
+        # Return updated stats panel
+        return Div(
+            P(f"Retraining {result['state']}", style=f"color: {'var(--fg-green)' if result['state'] == 'COMPLETE' else 'var(--fg-red)'}; font-weight: bold; margin-bottom: 12px;"),
+            Div(
+                id="feedback-panel",
+                **{"hx-get": "/api/v1/feedback/stats", "hx-trigger": "load", "hx-swap": "innerHTML"},
+            ),
+        )
+
+    @rt("/api/v1/feedback/retrain-status")
+    def retrain_status():
+        from stream.feedback.pipeline import get_retrain_status
+        return get_retrain_status()
+
+    # === DRIFT MONITOR ===
+
+    @rt("/api/v1/drift/status")
+    def drift_status():
+        from stream.drift.monitor import get_status
+
+        d = get_status()
+        status = d["status"]
+        psi = d["psi"]
+        stats = d["stats"]
+        color_map = {"green": "var(--fg-green)", "yellow": "var(--fg-orange)", "red": "var(--fg-red)", "dim": "var(--fg-dim)"}
+        status_color = color_map.get(d["color"], "var(--fg-dim)")
+
+        parts = [
+            Div(
+                Span("DRIFT: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                Span(status, style=f"color: {status_color}; font-weight: bold; font-size: 14px;"),
+                Span(f"  PSI: {psi:.4f}" if psi is not None else "  PSI: —",
+                     style="color: var(--fg-subtle); margin-left: 12px; font-size: 11px;"),
+                style="margin-bottom: 12px;",
+            ),
+        ]
+
+        if stats["n_scores"] > 0:
+            parts.append(
+                DataGrid(
+                    DataReadout("MEAN SCORE", f"{stats['mean']:.3f}"),
+                    DataReadout("STD DEV", f"{stats['std']:.3f}"),
+                    DataReadout("P95", f"{stats['p95']:.3f}"),
+                    DataReadout("BUFFER", f"{stats['n_scores']}"),
+                ),
+            )
+
+        if status == "CALIBRATING":
+            parts.append(
+                P(f"Collecting baseline... {d['remaining']} more scores needed.",
+                  style="color: var(--fg-dim); font-size: 11px; margin-top: 8px;"),
+            )
+
+        if status == "RED":
+            parts.append(
+                Div(
+                    P("DRIFT DETECTED — RETRAIN RECOMMENDED",
+                      style="color: var(--fg-red); font-weight: bold; font-size: 12px; letter-spacing: 1px; text-align: center; padding: 8px; border: 1px solid var(--fg-red); margin-top: 12px; animation: pulse 2s infinite;"),
+                ),
+            )
+
+        return Div(*parts)
+
+    @rt("/api/v1/drift/distribution")
+    def drift_distribution():
+        from stream.drift.monitor import get_distribution
+        return get_distribution()
+
+    # === AGENT INVESTIGATION ===
+
+    @rt("/api/v1/agent/investigate/{tx_id}", methods=["POST"])
+    async def investigate_tx(tx_id: str):
+        from stream.agent.investigator import run_investigation, get_investigation
+        import asyncio
+
+        existing = get_investigation(tx_id)
+        if existing and existing["status"] == "RUNNING":
+            return Div(
+                P("Investigation already in progress...", style="color: var(--fg-orange);"),
+                Div(id="investigation-panel",
+                    **{"hx-get": f"/api/v1/agent/investigation/{tx_id}", "hx-trigger": "every 2s", "hx-swap": "innerHTML"}),
+            )
+
+        # Start investigation in background
+        asyncio.create_task(run_investigation(tx_id))
+
+        return Div(
+            P("Investigation started...", style="color: var(--fg-green); font-weight: bold;"),
+            Div(id="investigation-panel",
+                **{"hx-get": f"/api/v1/agent/investigation/{tx_id}", "hx-trigger": "every 2s", "hx-swap": "innerHTML"}),
+        )
+
+    @rt("/api/v1/agent/investigation/{tx_id}")
+    def get_investigation_status(tx_id: str):
+        from stream.agent.investigator import get_investigation
+
+        investigation = get_investigation(tx_id)
+        if not investigation:
+            return Div(P("No investigation found.", style="color: var(--fg-dim);"))
+
+        steps_html = []
+        for step in investigation["steps"]:
+            if step["type"] == "tool_call":
+                steps_html.append(
+                    Div(
+                        Span(f"→ {step['tool']}", style="color: var(--fg-green); font-weight: bold;"),
+                        Span(f"({', '.join(f'{k}={v}' for k, v in step.get('input', {}).items())})",
+                             style="color: var(--fg-dim); margin-left: 8px; font-size: 10px;"),
+                        cls="investigation-step",
+                    )
+                )
+            elif step["type"] == "tool_result":
+                steps_html.append(
+                    Div(
+                        Pre(step["result"], style="color: var(--fg-subtle); font-size: 10px; white-space: pre-wrap; margin: 4px 0 8px 16px; max-height: 120px; overflow-y: auto;"),
+                        cls="investigation-step",
+                    )
+                )
+            elif step["type"] == "thinking":
+                steps_html.append(
+                    Div(
+                        P(step["content"][:300], style="color: var(--fg-white); opacity: 0.8; font-size: 11px; margin: 4px 0;"),
+                        cls="investigation-step",
+                    )
+                )
+            elif step["type"] == "error":
+                steps_html.append(
+                    Div(P(step["content"], style="color: var(--fg-red);"), cls="investigation-step")
+                )
+
+        # Status indicator
+        status = investigation["status"]
+        status_color = {"RUNNING": "var(--fg-orange)", "COMPLETE": "var(--fg-green)", "ERROR": "var(--fg-red)"}.get(status, "var(--fg-dim)")
+
+        parts = [
+            Div(
+                Span("INVESTIGATION ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                Span(status, style=f"color: {status_color}; font-weight: bold; font-size: 12px;"),
+                style="margin-bottom: 12px;",
+            ),
+            Div(*steps_html, cls="investigation-log"),
+        ]
+
+        if investigation["report"]:
+            parts.append(
+                Div(
+                    H4("INVESTIGATION REPORT", style="color: var(--fg-green); font-size: 10px; margin-top: 16px; margin-bottom: 8px; letter-spacing: 1px;"),
+                    Pre(investigation["report"],
+                        style="color: var(--fg-white); white-space: pre-wrap; font-size: 11px; "
+                              "border-left: 2px solid var(--fg-green); padding-left: 12px; line-height: 1.6;"),
+                    cls="investigation-report",
+                )
+            )
+
+        # Keep polling if still running
+        if status == "RUNNING":
+            return Div(*parts, id="investigation-panel",
+                       **{"hx-get": f"/api/v1/agent/investigation/{tx_id}", "hx-trigger": "every 2s", "hx-swap": "innerHTML"})
+        return Div(*parts)
+
     # === INTEGRATION ===
 
     @rt("/api/v1/integration/webhook", methods=["POST"])
@@ -1037,6 +1300,7 @@ def register_api_routes(rt):
                 "risk_label": scored["risk_label"],
                 "model_name": scored["model_name"],
                 "explanation": scored["shap_features"],
+                "raw_input": {"vsize": vsize, "fee": fee, "fee_rate": fee / max(vsize, 1)},
             })
 
         result = {
@@ -1136,6 +1400,7 @@ def register_api_routes(rt):
                                         "risk_label": risk_label,
                                         "model_name": result["model_name"],
                                         "explanation": result["shap_features"],
+                                        "raw_input": {"vsize": vsize, "fee": fee, "fee_rate": fee_rate},
                                     })
                             except Exception:
                                 pass

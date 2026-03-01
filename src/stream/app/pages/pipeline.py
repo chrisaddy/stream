@@ -55,7 +55,18 @@ def pipeline_page():
                 style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
             ),
 
-            status="4 FLOWS",
+            # Feedback pipeline
+            H4("Feedback Retraining Pipeline", style="color: var(--fg-iris); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
+            Div(
+                Span("LOAD_REVIEWS", cls="flow-node active"), Span("->", cls="flow-arrow"),
+                Span("JOIN_FEATURES", cls="flow-node active"), Span("->", cls="flow-arrow"),
+                Span("TRAIN_LGBM", cls="flow-node active"), Span("->", cls="flow-arrow"),
+                Span("EVALUATE", cls="flow-node active"), Span("->", cls="flow-arrow"),
+                Span("DEPLOY_LIVE", cls="flow-node active"),
+                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
+            ),
+
+            status="5 FLOWS",
             footer_left="[PIP-001] PREFECT CLOUD",
             footer_right="ORCHESTRATION",
         ),

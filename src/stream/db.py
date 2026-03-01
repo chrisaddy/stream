@@ -78,3 +78,37 @@ def save_review(kwargs: dict):
         log.warning("save_review failed", error=str(e))
     finally:
         db.close()
+
+
+def load_setting(key: str, default: str | None = None) -> str | None:
+    """Load a setting value from the database."""
+    from stream.models.settings import Setting
+
+    db = SessionLocal()
+    try:
+        row = db.query(Setting).filter(Setting.key == key).first()
+        return row.value if row else default
+    except Exception as e:
+        log.warning("load_setting failed", key=key, error=str(e))
+        return default
+    finally:
+        db.close()
+
+
+def save_setting(key: str, value: str):
+    """Upsert a setting value in the database."""
+    from stream.models.settings import Setting
+
+    db = SessionLocal()
+    try:
+        row = db.query(Setting).filter(Setting.key == key).first()
+        if row:
+            row.value = value
+        else:
+            db.add(Setting(key=key, value=value))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log.warning("save_setting failed", key=key, error=str(e))
+    finally:
+        db.close()

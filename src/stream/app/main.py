@@ -9,6 +9,7 @@ from stream.models.base import Base
 from stream.models.predictions import PredictionRecord  # noqa: F401 — register table
 from stream.models.alerts import AlertRecord  # noqa: F401 — register table
 from stream.models.reviews import ReviewRecord  # noqa: F401 — register table
+from stream.models.settings import Setting  # noqa: F401 — register table
 from stream.app.pages.home import home_page
 from stream.app.pages.illicit import illicit_page
 from stream.app.pages.fees import fees_page

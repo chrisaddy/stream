@@ -538,6 +538,48 @@ input[type="range"]::-moz-range-thumb {
     border: 2px solid var(--bg-color);
 }
 
+/* Agent investigation */
+.agent-btn {
+    border-color: var(--fg-iris);
+    color: var(--fg-iris);
+}
+.agent-btn:hover {
+    background: var(--fg-iris);
+    color: var(--bg-color);
+}
+
+.investigation-step {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(224, 222, 244, 0.03);
+}
+
+.investigation-log {
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fg-dim) transparent;
+    padding: 8px;
+    border: 1px solid var(--highlight-med);
+    background: rgba(35, 33, 54, 0.5);
+    font-family: var(--font-mono);
+}
+
+.investigation-report {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--fg-green);
+    background: rgba(156, 207, 216, 0.04);
+}
+
+/* Drift banner */
+.drift-banner {
+    text-align: center;
+    padding: 8px 16px;
+    border: 1px solid var(--fg-red);
+    animation: pulse 2s infinite;
+    margin-top: 12px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .app-layout { grid-template-columns: 1fr; }

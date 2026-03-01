@@ -138,6 +138,43 @@ def home_page():
             cls="triple-row",
         ),
 
+        # Feedback loop + Drift monitor — side by side
+        Div(
+            DiagnosticFrame(
+                "FEEDBACK LOOP",
+
+                P("Review alerts as TP/FP above, then retrain the scoring model on your labels.",
+                  style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+                Div(
+                    id="feedback-panel",
+                    **{"hx-get": "/api/v1/feedback/stats", "hx-trigger": "load, every 15s", "hx-swap": "innerHTML"},
+                ),
+
+                status="LEARNING",
+                footer_left="HUMAN-IN-THE-LOOP",
+                footer_right="RETRAIN_PIPELINE",
+            ),
+
+            DiagnosticFrame(
+                "DRIFT MONITOR",
+
+                P("Score distribution stability — detects when the mempool shifts away from baseline.",
+                  style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+                Div(
+                    id="drift-panel",
+                    **{"hx-get": "/api/v1/drift/status", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                ),
+
+                status="WATCHING",
+                footer_left="PSI MONITOR",
+                footer_right="DISTRIBUTION_SHIFT",
+            ),
+
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
+        ),
+
         # Oscilloscope JS — reacts to incoming SSE scores
         Script("""
         const canvas = document.getElementById('oscilloscope');
