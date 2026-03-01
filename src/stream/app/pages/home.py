@@ -33,6 +33,9 @@ def home_page():
             # Oscilloscope canvas
             Canvas(id="oscilloscope", cls="oscilloscope"),
 
+            P("Live scoring uses a mempool-features heuristic. The trained XGBoost model is available at /illicit for 166-feature input.",
+              style="color: var(--fg-dim); font-size: 10px; letter-spacing: 0.5px; margin-top: 8px; padding: 6px 10px; border: 1px dashed var(--highlight-med); background: rgba(57, 53, 82, 0.3);"),
+
             # Data readouts (live via HTMX)
             Div(
                 id="home-stats",

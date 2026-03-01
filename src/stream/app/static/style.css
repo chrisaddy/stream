@@ -580,6 +580,42 @@ input[type="range"]::-moz-range-thumb {
     margin-top: 12px;
 }
 
+/* Model source badge */
+.model-badge {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 1px 4px;
+    border: 1px solid var(--fg-dim);
+    color: var(--fg-dim);
+    vertical-align: middle;
+    margin-left: 4px;
+}
+.model-badge-ml {
+    border-color: var(--fg-green);
+    color: var(--fg-green);
+}
+
+/* Demo data banner */
+.demo-banner {
+    border: 1px dashed var(--fg-orange);
+    padding: 12px;
+    position: relative;
+    background: rgba(246, 193, 119, 0.04);
+}
+.demo-banner::before {
+    content: "[DEMO DATA]";
+    position: absolute;
+    top: -8px;
+    left: 12px;
+    background: var(--bg-color);
+    color: var(--fg-orange);
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .app-layout { grid-template-columns: 1fr; }

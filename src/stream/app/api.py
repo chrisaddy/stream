@@ -12,7 +12,7 @@ import structlog
 from fasthtml.common import *
 
 from stream.app.components import (
-    Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge, Tip,
+    Card, DataGrid, DataReadout, DemoBanner, FeedRow, MetricItem, MetricsRow, StatusBadge, Tip,
 )
 from stream.app.models import get_model, get_model_card, get_cached_features
 from stream.db import write_in_thread, save_prediction, save_alert, save_review, SessionLocal
@@ -29,6 +29,53 @@ def register_api_routes(rt):
     @rt("/api/v1/health")
     def health():
         return {"status": "ok", "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(), "models_loaded": bool(get_model("illicit-xgboost"))}
+
+    @rt("/api/v1/system/status")
+    def system_status():
+        from stream.config import settings
+
+        status = {}
+
+        # DB connectivity
+        try:
+            db = SessionLocal()
+            try:
+                db.execute("SELECT 1" if hasattr(db, "execute") else None)
+                status["db"] = "live"
+            finally:
+                db.close()
+        except Exception:
+            status["db"] = "unavailable"
+
+        # Models loaded
+        model_names = ["illicit-xgboost", "fee-lgbm", "lightning-lgbm", "onboarding-xgb"]
+        loaded = [n for n in model_names if get_model(n) is not None]
+        status["models"] = {"loaded": loaded, "total": len(model_names)}
+
+        # R2
+        try:
+            import boto3
+            if settings.R2_ENDPOINT_URL:
+                s3 = boto3.client(
+                    "s3",
+                    endpoint_url=settings.R2_ENDPOINT_URL,
+                    aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                )
+                s3.list_objects_v2(Bucket=settings.R2_BUCKET_NAME, MaxKeys=1)
+                status["r2"] = "live"
+            else:
+                status["r2"] = "not configured"
+        except Exception:
+            status["r2"] = "unavailable"
+
+        # Prefect
+        status["prefect"] = "configured" if settings.PREFECT_API_URL else "not configured"
+
+        # Claude
+        status["claude"] = "configured" if settings.ANTHROPIC_API_KEY else "not configured"
+
+        return status
 
     # === HOME STATS ===
 
@@ -92,28 +139,36 @@ def register_api_routes(rt):
 
     @rt("/api/v1/illicit/score", methods=["POST"])
     async def illicit_score(request):
+        from stream.app.schemas import IllicitScoreRequest
+        from pydantic import ValidationError
+
         start = time.time()
         form = await request.form()
         features_str = form.get("features", "")
 
         try:
+            IllicitScoreRequest(features=features_str)
             features = [float(x.strip()) for x in features_str.split(",") if x.strip()]
+        except ValidationError as e:
+            errors = "; ".join(err["msg"] for err in e.errors())
+            return Div(P(f"Validation error: {errors}", style="color: var(--fg-red);"))
         except ValueError:
             return Div(P("Invalid feature format. Enter comma-separated numbers.", style="color: var(--fg-red);"))
 
         model = get_model("illicit-xgboost")
+        threshold = get_risk_threshold()
         if model is None:
             # Demo mode: generate synthetic result
             risk_score = np.random.beta(2, 5)
-            risk_label = "high" if risk_score > 0.7 else "medium" if risk_score > 0.4 else "low"
+            risk_label = "high" if risk_score > threshold else "medium" if risk_score > threshold * 0.6 else "low"
             inference_ms = (time.time() - start) * 1000
 
-            return _score_result(risk_score, risk_label, inference_ms, features[:5] if features else [])
+            return DemoBanner(_score_result(risk_score, risk_label, inference_ms, features[:5] if features else []))
 
         X = np.array(features).reshape(1, -1)
         risk_score = float(model.predict_proba(X)[:, 1][0])
         inference_ms = (time.time() - start) * 1000
-        risk_label = "high" if risk_score > 0.7 else "medium" if risk_score > 0.4 else "low"
+        risk_label = "high" if risk_score > threshold else "medium" if risk_score > threshold * 0.6 else "low"
 
         return _score_result(risk_score, risk_label, inference_ms, features[:5])
 
@@ -328,15 +383,20 @@ def register_api_routes(rt):
                         pass
 
                 # Fallback to heuristic formula
+                source = "ml"
                 if score is None:
                     score = min(channels / 1000, 1.0) * 0.5 + min(capacity / 500, 1.0) * 0.5
+                    source = "heuristic"
+
+                badge_cls = "model-badge model-badge-ml" if source == "ml" else "model-badge"
+                badge_text = "ML" if source == "ml" else "HEURISTIC"
 
                 rows.append(Tr(
                     Td(str(i + 1)),
                     Td(alias),
                     Td(f"{channels:,}" if isinstance(channels, int) else str(channels)),
                     Td(f"{capacity:,.1f}"),
-                    Td(f"{score:.3f}", style="color: var(--fg-green);"),
+                    Td(Span(f"{score:.3f}"), Span(" "), Span(badge_text, cls=badge_cls), style="color: var(--fg-green);"),
                 ))
             return rows
         except Exception as e:
@@ -345,11 +405,19 @@ def register_api_routes(rt):
     @rt("/api/v1/lightning/evaluate", methods=["POST"])
     async def evaluate_node(request):
         from stream.lightning.model import FEATURE_COLS
+        from stream.app.schemas import LightningEvaluateRequest
+        from pydantic import ValidationError
 
         form = await request.form()
         pubkey = form.get("pubkey", "").strip()
         if not pubkey:
             return P("Enter a public key.", style="color: var(--fg-red);")
+
+        try:
+            LightningEvaluateRequest(pubkey=pubkey)
+        except ValidationError as e:
+            errors = "; ".join(err["msg"] for err in e.errors())
+            return P(f"Validation error: {errors}", style="color: var(--fg-red);")
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -386,10 +454,10 @@ def register_api_routes(rt):
                     DataReadout("ALIAS", alias),
                     DataReadout("CHANNELS", str(channels)),
                     DataReadout("CAPACITY", f"{capacity:.1f} BTC"),
-                    DataReadout("ROUTING_SCORE", f"{score:.3f}", highlight=True),
+                    DataReadout("CAPACITY_SCORE", f"{score:.3f}", highlight=True),
                     DataReadout("SOURCE", scoring_source),
                 ),
-                P(f"Node {alias} has {channels} channels with {capacity:.1f} BTC capacity. Routing score: {score:.3f} ({scoring_source})",
+                P(f"Node {alias} has {channels} channels with {capacity:.1f} BTC capacity. Capacity score: {score:.3f} ({scoring_source})",
                   style="margin-top: 12px; color: var(--fg-dim);"),
             )
         except Exception as e:
@@ -556,11 +624,12 @@ def register_api_routes(rt):
                 db.close()
 
             if alerts:
+                threshold = get_risk_threshold()
                 for a in alerts:
                     ts = a.timestamp.strftime("%H:%M:%S") if a.timestamp else "—"
                     tx_short = f"{a.tx_id[:4]}...{a.tx_id[-4:]}" if len(a.tx_id) > 8 else a.tx_id
                     score = a.risk_score
-                    risk_cls = "risk-high" if score > 0.7 else "risk-medium" if score > 0.4 else "risk-low"
+                    risk_cls = "risk-high" if score > threshold else "risk-medium" if score > threshold * 0.6 else "risk-low"
                     badge = "badge-red" if a.status == "escalated" else "badge-yellow" if a.status == "pending" else "badge-green"
                     rows.append(Tr(
                         Td(ts, style="color: var(--fg-dim);"),
@@ -576,6 +645,7 @@ def register_api_routes(rt):
             log.debug("DB query failed for alerts, falling back to demo", error=str(e))
 
         # Demo fallback
+        threshold = get_risk_threshold()
         demo = [
             ("14:23:01", "7a3f...e91b", 0.92, "HIGH", "pending"),
             ("14:21:45", "b2c8...4d3a", 0.78, "HIGH", "pending"),
@@ -584,7 +654,7 @@ def register_api_routes(rt):
             ("14:12:33", "c4e7...a1d8", 0.88, "HIGH", "escalated"),
         ]
         for ts, tx, score, label, status in demo:
-            risk_cls = "risk-high" if score > 0.7 else "risk-medium" if score > 0.4 else "risk-low"
+            risk_cls = "risk-high" if score > threshold else "risk-medium" if score > threshold * 0.6 else "risk-low"
             badge = "badge-red" if status == "escalated" else "badge-yellow" if status == "pending" else "badge-green"
             rows.append(Tr(
                 Td(ts, style="color: var(--fg-dim);"),
@@ -595,7 +665,7 @@ def register_api_routes(rt):
                 Td(A("Review", href="#", cls="spark-btn", style="padding: 4px 8px; font-size: 9px;",
                       **{"hx-get": f"/api/v1/alerts/detail/{tx}", "hx-target": "#alert-detail"})),
             ))
-        return rows
+        return (Tr(Td(DemoBanner(P("Demo alert data — database unavailable")), colspan="6")), *rows)
 
     @rt("/api/v1/alerts/detail/{tx_id}")
     async def alert_detail(tx_id: str):
@@ -680,7 +750,7 @@ def register_api_routes(rt):
             return Div(
                 H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
                 DataGrid(
-                    DataReadout("RISK_SCORE", f"{score:.2f}", variant="danger" if score > 0.7 else ""),
+                    DataReadout("RISK_SCORE", f"{score:.2f}", variant="danger" if score > get_risk_threshold() else ""),
                     DataReadout("MODEL", model_name),
                     DataReadout("STATUS", alert.status.upper()),
                 ),
@@ -697,7 +767,7 @@ def register_api_routes(rt):
             )
 
         # Demo fallback
-        return Div(
+        return DemoBanner(Div(
             H4(f"Alert: {tx_id}", style="color: var(--fg-green); margin-bottom: 12px;"),
             DataGrid(
                 DataReadout("RISK_SCORE", "0.92", variant="danger"),
@@ -734,7 +804,7 @@ def register_api_routes(rt):
                 style="margin-top: 12px;",
             ),
             Div(id="investigation-detail"),
-        )
+        ))
 
     # === SETTINGS ===
 
@@ -744,8 +814,16 @@ def register_api_routes(rt):
 
     @rt("/api/v1/settings/threshold", methods=["POST"])
     async def post_threshold(request):
+        from stream.app.schemas import ThresholdRequest
+        from pydantic import ValidationError
+
         form = await request.form()
         val = float(form.get("threshold", 0.7))
+        try:
+            ThresholdRequest(value=val)
+        except ValidationError as e:
+            errors = "; ".join(err["msg"] for err in e.errors())
+            return Span(f"Error: {errors}", id="threshold-value", style="color: var(--fg-red);")
         set_risk_threshold(val)
         return Span(f"{get_risk_threshold():.2f}", id="threshold-value")
 
@@ -807,7 +885,7 @@ def register_api_routes(rt):
             return Div(
                 H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
                 DataGrid(
-                    DataReadout("RISK_SCORE", f"{risk_score:.2f}", variant="danger" if risk_score > 0.7 else ""),
+                    DataReadout("RISK_SCORE", f"{risk_score:.2f}", variant="danger" if risk_score > get_risk_threshold() else ""),
                     DataReadout("MODEL", model_name),
                     DataReadout("STATUS", "REVIEWED"),
                 ),
@@ -840,12 +918,12 @@ def register_api_routes(rt):
     @rt("/api/v1/models/stats/{model_name}")
     def model_stats(model_name: str):
         # Demo stats (would pull from Prefect API in production)
-        return MetricsRow(
+        return DemoBanner(MetricsRow(
             MetricItem("LAST_TRAINED", "2h ago"),
             MetricItem("FRESHNESS", "FRESH"),
             MetricItem("PREDICTIONS", "1,247"),
             MetricItem("AVG_LATENCY", "2.3ms"),
-        )
+        ))
 
     @rt("/api/v1/models/{model_name}/chart/{chart_type}")
     def model_chart(model_name: str, chart_type: str):
@@ -966,46 +1044,109 @@ def register_api_routes(rt):
     # === PIPELINE ===
 
     @rt("/api/v1/pipeline/recent-runs")
-    def recent_runs():
-        # Demo data (would pull from Prefect Cloud API)
-        runs = [
-            ("illicit-detection-training", "2h ago", "4m 23s", "SUCCESS"),
-            ("fee-estimation-training", "3h ago", "1m 12s", "SUCCESS"),
-            ("lightning-network-analysis", "5h ago", "2m 45s", "SUCCESS"),
-            ("onboarding-risk-scoring", "6h ago", "0m 58s", "SUCCESS"),
-            ("illicit-detection-training", "1d ago", "4m 18s", "SUCCESS"),
-        ]
+    async def recent_runs():
+        from stream.config import settings
 
-        rows = []
-        for name, started, duration, status in runs:
-            color = "var(--fg-green)" if status == "SUCCESS" else "var(--fg-red)"
-            rows.append(Tr(
-                Td(name),
-                Td(started, style="color: var(--fg-dim);"),
-                Td(duration),
-                Td(Span(status, style=f"color: {color};")),
-            ))
-        return rows
+        if settings.PREFECT_API_URL and settings.PREFECT_API_KEY:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        f"{settings.PREFECT_API_URL}/flow_runs/filter",
+                        headers={"Authorization": f"Bearer {settings.PREFECT_API_KEY}"},
+                        json={"sort": "EXPECTED_START_TIME_DESC", "limit": 10},
+                    )
+                    resp.raise_for_status()
+                    flow_runs = resp.json()
+
+                rows = []
+                for run in flow_runs:
+                    name = run.get("name", run.get("flow_id", "unknown"))
+                    state = run.get("state", {})
+                    status = state.get("type", "UNKNOWN").upper()
+                    started = run.get("start_time", run.get("expected_start_time", "—"))
+                    if started and started != "—":
+                        started = started[:19].replace("T", " ")
+                    duration = ""
+                    if run.get("total_run_time"):
+                        secs = run["total_run_time"]
+                        duration = f"{int(secs // 60)}m {int(secs % 60)}s"
+                    elif run.get("estimated_run_time"):
+                        secs = run["estimated_run_time"]
+                        duration = f"{int(secs // 60)}m {int(secs % 60)}s"
+
+                    color = "var(--fg-green)" if status == "COMPLETED" else "var(--fg-red)" if status == "FAILED" else "var(--fg-orange)"
+                    rows.append(Tr(
+                        Td(name),
+                        Td(started, style="color: var(--fg-dim);"),
+                        Td(duration),
+                        Td(Span(status, style=f"color: {color};")),
+                    ))
+                return rows
+            except Exception as e:
+                log.warning("Prefect API call failed", error=str(e))
+                return (Tr(Td(
+                    P(f"Pipeline data unavailable — check PREFECT_API_KEY ({e})",
+                      style="color: var(--fg-orange); font-size: 11px;"),
+                    colspan="4")),)
+
+        # No Prefect configured — honest fallback
+        return (Tr(Td(
+            DemoBanner(P("Pipeline data unavailable — PREFECT_API_URL not configured. Set env vars to see real pipeline runs.")),
+            colspan="4")),)
 
     @rt("/api/v1/pipeline/freshness")
     def model_freshness():
-        models = [
-            ("illicit-xgboost", "2h ago", "FRESH"),
-            ("illicit-gcn", "2h ago", "FRESH"),
-            ("fee-lgbm", "3h ago", "FRESH"),
-            ("lightning-lgbm", "5h ago", "FRESH"),
-            ("onboarding-xgb", "6h ago", "FRESH"),
-        ]
+        from stream.config import settings
+
+        model_names = ["illicit-xgboost", "fee-lgbm", "lightning-lgbm", "onboarding-xgb"]
+        rows = []
+
+        # Try R2 head_object for real freshness data
+        r2_available = False
+        if settings.R2_ENDPOINT_URL:
+            try:
+                import boto3
+                s3 = boto3.client(
+                    "s3",
+                    endpoint_url=settings.R2_ENDPOINT_URL,
+                    aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                )
+                for name in model_names:
+                    try:
+                        resp = s3.head_object(Bucket=settings.R2_BUCKET_NAME, Key=f"models/{name}/latest.pkl")
+                        last_modified = resp["LastModified"]
+                        age = datetime.datetime.now(datetime.timezone.utc) - last_modified
+                        if age.days > 0:
+                            when = f"{age.days}d ago"
+                        elif age.seconds > 3600:
+                            when = f"{age.seconds // 3600}h ago"
+                        else:
+                            when = f"{age.seconds // 60}m ago"
+                        status = "FRESH" if age.days < 7 else "STALE"
+                        rows.append((name, when, status))
+                    except Exception:
+                        rows.append((name, "not found in R2", "UNKNOWN"))
+                r2_available = True
+            except Exception as e:
+                log.debug("R2 freshness check failed", error=str(e))
+
+        if not r2_available:
+            # Check which models are loaded in memory
+            for name in model_names:
+                loaded = get_model(name) is not None
+                status = "LOADED" if loaded else "NOT LOADED"
+                rows.append((name, "—", status))
 
         return Table(
-            Thead(Tr(Th("Model"), Th("Last Trained"), Th("Status"))),
+            Thead(Tr(Th("Model"), Th("Last Modified"), Th("Status"))),
             Tbody(*[
                 Tr(
                     Td(name),
                     Td(when, style="color: var(--fg-dim);"),
-                    Td(Span(status, cls="badge-sm badge-green" if status == "FRESH" else "badge-sm badge-yellow")),
+                    Td(Span(status, cls="badge-sm badge-green" if status in ("FRESH", "LOADED") else "badge-sm badge-yellow")),
                 )
-                for name, when, status in models
+                for name, when, status in rows
             ]),
             cls="spark-table",
         )
@@ -1276,6 +1417,13 @@ def register_api_routes(rt):
         vsize = int(payload.get("vsize", 250))
         fee = int(payload.get("fee", 1000))
 
+        from stream.app.schemas import LiveScoreRequest
+        from pydantic import ValidationError
+        try:
+            LiveScoreRequest(vsize=vsize, fee=fee)
+        except ValidationError as e:
+            return {"error": "validation_error", "details": e.errors()}, 422
+
         scored = await score_transaction(txid, vsize, fee)
 
         audit_id = str(uuid.uuid4())
@@ -1368,12 +1516,17 @@ def register_api_routes(rt):
 
                         now = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
 
+                        model_name = result["model_name"]
+                        is_ml = "heuristic" not in model_name.lower()
+                        badge_cls = "model-badge model-badge-ml" if is_ml else "model-badge"
+                        badge_text = "ML" if is_ml else "HEURISTIC"
+
                         html = f"""<div class="feed-row {'high-risk' if risk_score > thresh else ''}">
                             <div style="color: var(--fg-dim);">{now}</div>
                             <div style="font-weight: bold;">{txid[:16]}...</div>
                             <div>{vsize} vB</div>
                             <div>{fee_rate:.1f} sat/vB</div>
-                            <div class="{risk_cls}">{risk_score:.3f}</div>
+                            <div class="{risk_cls}">{risk_score:.3f} <span class="{badge_cls}">{badge_text}</span></div>
                             <div>{risk_label}</div>
                         </div>"""
 
@@ -1416,11 +1569,12 @@ def register_api_routes(rt):
 
 
 def _score_result(risk_score, risk_label, inference_ms, top_features):
-    risk_cls = "risk-high" if risk_score > 0.7 else "risk-medium" if risk_score > 0.4 else "risk-low"
+    threshold = get_risk_threshold()
+    risk_cls = "risk-high" if risk_score > threshold else "risk-medium" if risk_score > threshold * 0.6 else "risk-low"
 
     return Div(
         DataGrid(
-            DataReadout("RISK_SCORE", f"{risk_score:.4f}", highlight=risk_score < 0.4, variant="danger" if risk_score > 0.7 else ""),
+            DataReadout("RISK_SCORE", f"{risk_score:.4f}", highlight=risk_score < threshold * 0.6, variant="danger" if risk_score > threshold else ""),
             DataReadout("RISK_LABEL", risk_label.upper()),
             DataReadout("INFERENCE_TIME", f"{inference_ms:.1f}ms"),
             DataReadout("MODEL", "illicit-xgboost v1.0"),

@@ -51,7 +51,7 @@ def lightning_page():
                     Th("Rank"), Th("Alias"),
                     Th(Tip("Channels", "Payment channels between Lightning nodes. Funds are locked in a channel to enable off-chain transactions.")),
                     Th(Tip("Capacity (BTC)", "Total Bitcoin locked in this node's channels, available for routing payments.")),
-                    Th(Tip("Routing Score", "ML-predicted score for how effective this node is at routing payments through the network.")),
+                    Th(Tip("Capacity Score", "ML-predicted channel capacity score from network topology features. Falls back to heuristic when model unavailable.")),
                 )),
                 Tbody(
                     id="top-nodes",
@@ -59,6 +59,9 @@ def lightning_page():
                 ),
                 cls="spark-table",
             ),
+
+            P("Scores predict channel capacity from network topology features. Source indicator shows ML or HEURISTIC per node.",
+              style="color: var(--fg-dim); font-size: 10px; margin-top: 8px; letter-spacing: 0.5px;"),
 
             status="RANKED",
             footer_left="NODE CENTRALITY RANKING",

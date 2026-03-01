@@ -79,26 +79,38 @@ def CounterBox(label: str, value: str):
     )
 
 
-def FeedRow(timestamp, tx_id, size, fee_rate, risk_score, risk_label):
+def FeedRow(timestamp, tx_id, size, fee_rate, risk_score, risk_label, threshold=0.7, model_name=""):
     risk_cls = "risk-low"
-    if risk_score > 0.7:
+    if risk_score > threshold:
         risk_cls = "risk-high"
-    elif risk_score > 0.4:
+    elif risk_score > threshold * 0.6:
         risk_cls = "risk-medium"
 
     row_cls = "feed-row"
-    if risk_score > 0.7:
+    if risk_score > threshold:
         row_cls += " high-risk"
+
+    badge = ""
+    if model_name:
+        is_ml = "heuristic" not in model_name.lower()
+        badge_cls = "model-badge model-badge-ml" if is_ml else "model-badge"
+        badge_text = "ML" if is_ml else "HEURISTIC"
+        badge = Span(badge_text, cls=badge_cls)
 
     return Div(
         Div(timestamp, style="color: var(--fg-dim);"),
         Div(tx_id, style="font-weight: bold;"),
         Div(f"{size} vB"),
         Div(f"{fee_rate:.1f} sat/vB"),
-        Div(f"{risk_score:.2f}", cls=risk_cls),
+        Div(Span(f"{risk_score:.2f}"), Span(" "), badge, cls=risk_cls) if badge else Div(f"{risk_score:.2f}", cls=risk_cls),
         Div(risk_label),
         cls=row_cls,
     )
+
+
+def DemoBanner(*children):
+    """Wrap content in a visible demo-data indicator."""
+    return Div(*children, cls="demo-banner")
 
 
 def FeedHeader():
