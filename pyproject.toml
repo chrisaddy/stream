@@ -19,6 +19,8 @@ dependencies = [
     "numpy>=2.2.0",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
+    # Cloud storage (R2 model loading)
+    "boto3>=1.35.0",
     # HTTP
     "httpx>=0.28.0",
     # LLM
@@ -29,7 +31,6 @@ dependencies = [
     "networkx>=3.4.0",
     # Viz
     "plotly>=6.0.0",
-    "kaleido>=1.0.0",
     # Logging
     "structlog>=24.4.0",
 ]
