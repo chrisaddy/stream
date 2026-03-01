@@ -122,7 +122,7 @@ def FeedHeader():
         Div("RISK"),
         Div("LABEL"),
         Div("ANOMALY"),
-        cls="feed-row",
+        cls="feed-row feed-header",
         style="color: var(--fg-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid var(--fg-dim);",
     )
 
@@ -202,7 +202,7 @@ def Tip(text: str, tip: str = ""):
     desc = tip or TIPS.get(text, "")
     if not desc:
         return text
-    return Span(text, cls="tip", **{"data-tip": desc})
+    return Span(text, cls="tip", tabindex="0", **{"data-tip": desc})
 
 
 _PIPELINE_DAGS = {
@@ -244,6 +244,24 @@ def PipelineDag(model_name: str):
         status="PIPELINE",
         footer_left=f"[{model_name.upper()}] PREFECT",
         footer_right="ORCHESTRATION",
+    )
+
+
+def MobileNavToggle():
+    """CSS-only mobile hamburger menu toggle."""
+    return (
+        Input(type="checkbox", id="nav-toggle", cls="nav-toggle-checkbox"),
+        Label(
+            Span(cls="hamburger-line"),
+            Span(cls="hamburger-line"),
+            Span(cls="hamburger-line"),
+            htmlFor="nav-toggle",
+            cls="nav-hamburger",
+        ),
+        Div(
+            cls="nav-overlay",
+            onclick="document.getElementById('nav-toggle').checked=false",
+        ),
     )
 
 
@@ -292,10 +310,12 @@ def NavSidebar(current_path: str = "/"):
 def Page(title: str, current_path: str, *children):
     return (
         Title(f"STREAM // {title}"),
+        Meta(name="viewport", content="width=device-width, initial-scale=1.0"),
         Link(rel="stylesheet", href=f"/style.css?v={_CSS_VERSION}"),
         Script(src="https://unpkg.com/htmx.org@2.0.4"),
         Script(src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"),
         NoiseOverlay(),
+        *MobileNavToggle(),
         Div(
             NavSidebar(current_path),
             Main(*children, cls="main-content"),

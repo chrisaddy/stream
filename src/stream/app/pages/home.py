@@ -27,26 +27,6 @@ def home_page():
             footer_right="LIVE_DATA",
         ),
 
-        # Demo video
-        DiagnosticFrame(
-            "DEMO",
-
-            Video(
-                Source(src="/demo.mp4", type="video/mp4"),
-                controls=True,
-                style="width: 100%; border-radius: 4px; border: 1px solid var(--highlight-med);",
-                preload="metadata",
-            ),
-
-            P("4-minute walkthrough: live scoring, instant learning, drift detection, "
-              "self-healing adaptation, and anomaly detection — all on real Bitcoin mempool data.",
-              style="color: var(--fg-subtle); font-size: 11px; margin-top: 8px;"),
-
-            status="WALKTHROUGH",
-            footer_left="SCREEN CAPTURE + AI NARRATION",
-            footer_right="4:20",
-        ),
-
         DiagnosticFrame(
             "MEMPOOL STATUS",
 
@@ -205,7 +185,7 @@ def home_page():
                 footer_right="CUMULATIVE + ROLLING",
             ),
 
-            style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;",
+            cls="triple-row",
         ),
 
         # Anomaly detector panel
@@ -249,7 +229,7 @@ def home_page():
                     ),
                     style="flex: 2;",
                 ),
-                style="display: flex; gap: 24px;",
+                cls="race-layout",
             ),
 
             status="RACING",

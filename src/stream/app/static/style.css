@@ -631,10 +631,161 @@ input[type="range"]::-moz-range-thumb {
     100% { text-shadow: 0 0 4px rgba(246, 193, 119, 0.3); }
 }
 
-/* Responsive */
+/* Mobile nav toggle — base (hidden on desktop) */
+.nav-toggle-checkbox { display: none; }
+.nav-hamburger { display: none; }
+.nav-overlay { display: none; }
+
+/* Layout helpers (used by pages instead of inline styles) */
+.race-layout { display: flex; gap: 24px; }
+.form-grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* Responsive — Tablet landscape */
+@media (max-width: 1024px) {
+    .triple-row { grid-template-columns: 1fr 1fr; }
+    .triple-row > :last-child { grid-column: 1 / -1; }
+    .card-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .feed-row { grid-template-columns: 90px 120px 70px 70px 70px 55px 65px; }
+}
+
+/* Responsive — Tablet portrait */
 @media (max-width: 768px) {
     .app-layout { grid-template-columns: 1fr; }
-    .nav-sidebar { display: none; }
-    .feed-row { grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10px; }
+
+    /* Hamburger button */
+    .nav-hamburger {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 5px;
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        z-index: 1100;
+        width: 44px;
+        height: 44px;
+        align-items: center;
+        cursor: pointer;
+        background: var(--bg-surface);
+        border: 1px solid var(--fg-dim);
+    }
+    .hamburger-line {
+        display: block;
+        width: 22px;
+        height: 2px;
+        background: var(--fg-green);
+        transition: transform 0.3s, opacity 0.3s;
+    }
+
+    /* Animate to X when open */
+    .nav-toggle-checkbox:checked ~ .nav-hamburger .hamburger-line:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+    }
+    .nav-toggle-checkbox:checked ~ .nav-hamburger .hamburger-line:nth-child(2) {
+        opacity: 0;
+    }
+    .nav-toggle-checkbox:checked ~ .nav-hamburger .hamburger-line:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+    }
+
+    /* Sidebar as slide-out overlay */
+    .nav-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 220px;
+        z-index: 1050;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    .nav-toggle-checkbox:checked ~ .app-layout .nav-sidebar {
+        transform: translateX(0);
+    }
+
+    /* Semi-transparent backdrop */
+    .nav-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1040;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+    }
+    .nav-toggle-checkbox:checked ~ .nav-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Larger touch targets for nav links */
+    .nav-link { padding: 12px 8px; }
+
+    /* Main content clears hamburger */
+    .main-content { padding-top: 52px; }
+
+    /* Tighter frames */
+    .diagnostic-frame { margin: 10px 8px; }
+
+    /* Grids collapse */
     .triple-row { grid-template-columns: 1fr; }
+    .triple-row > :last-child { grid-column: auto; }
+    .card-grid { grid-template-columns: 1fr; }
+    .form-grid-2col { grid-template-columns: 1fr; }
+
+    /* Feed row — 2 columns at tablet */
+    .feed-row { grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10px; }
+
+    /* Tables scroll horizontally */
+    .spark-table { display: block; overflow-x: auto; }
+
+    /* Touch-friendly buttons & inputs */
+    .spark-btn { min-height: 44px; padding: 10px 16px; }
+    .spark-input { min-height: 44px; font-size: 14px; }
+
+    /* Larger slider thumbs for touch */
+    input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+    input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+
+    /* Tooltips below on mobile, centered */
+    .tip::after {
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: auto;
+        top: calc(100% + 8px);
+        width: min(280px, 80vw);
+    }
+    .tip:focus::after { opacity: 1; }
+
+    /* Smaller frame chrome */
+    .frame-header { font-size: 10px; height: 36px; padding: 0 10px; }
+    .frame-footer { font-size: 9px; height: 28px; padding: 0 10px; }
+}
+
+/* Responsive — Phone */
+@media (max-width: 480px) {
+    .diagnostic-frame { margin: 8px 4px; }
+    .frame-body { padding: 12px; }
+
+    /* Feed rows stack to single column */
+    .feed-row {
+        grid-template-columns: 1fr;
+        gap: 2px;
+        border-left: 2px solid var(--fg-dim);
+        padding: 8px 10px;
+        margin-bottom: 4px;
+    }
+    .feed-header { display: none; }
+
+    /* Data grid single column */
+    .data-grid { grid-template-columns: 1fr; }
+    .data-value { font-size: 16px; }
+    .counter-value { font-size: 22px; }
+
+    /* Smaller oscilloscope */
+    canvas.oscilloscope { height: 120px; }
+
+    /* Race layout stacks */
+    .race-layout { flex-direction: column; }
 }

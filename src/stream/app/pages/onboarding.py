@@ -77,7 +77,7 @@ def onboarding_page():
                               cls="spark-input"),
                         style="margin-bottom: 12px;",
                     ),
-                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
+                    cls="form-grid-2col",
                 ),
                 Button("Assess Risk", cls="spark-btn", type="submit", style="margin-top: 12px;"),
                 **{"hx-post": "/api/v1/onboarding/score", "hx-target": "#onboarding-result"},
