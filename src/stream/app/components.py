@@ -1,6 +1,10 @@
 """Reusable Spark-themed FastHTML components."""
 
+import time as _time
+
 from fasthtml.common import *
+
+_CSS_VERSION = int(_time.time())
 
 
 def NoiseOverlay():
@@ -207,7 +211,7 @@ def NavSidebar(current_path: str = "/"):
 def Page(title: str, current_path: str, *children):
     return (
         Title(f"STREAM // {title}"),
-        Link(rel="stylesheet", href="/style.css?v=2"),
+        Link(rel="stylesheet", href=f"/style.css?v={_CSS_VERSION}"),
         Script(src="https://unpkg.com/htmx.org@2.0.4"),
         Script(src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"),
         NoiseOverlay(),
