@@ -62,3 +62,19 @@ def save_alert(kwargs: dict):
         log.warning("save_alert failed", error=str(e))
     finally:
         db.close()
+
+
+def save_review(kwargs: dict):
+    """Create a ReviewRecord row. Runs in a thread via write_in_thread."""
+    from stream.models.reviews import ReviewRecord
+
+    db = SessionLocal()
+    try:
+        record = ReviewRecord(**kwargs)
+        db.add(record)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log.warning("save_review failed", error=str(e))
+    finally:
+        db.close()

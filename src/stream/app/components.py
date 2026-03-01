@@ -220,7 +220,6 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Fee Estimation", "/fees", active=current_path == "/fees"),
             NavLink("Lightning", "/lightning", active=current_path == "/lightning"),
             NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),
-            NavLink("Alert Queue", "/alerts", active=current_path == "/alerts"),
             NavLink("Pipeline", "/pipeline", active=current_path == "/pipeline"),
             cls="nav-section",
         ),

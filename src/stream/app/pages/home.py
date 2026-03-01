@@ -2,8 +2,9 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    CounterBox, DataGrid, DataReadout, DiagnosticFrame, FeedHeader, FeedRow, Page,
+    CounterBox, DataGrid, DataReadout, DiagnosticFrame, FeedHeader, FeedRow, Page, Tip,
 )
+from stream.services import get_risk_threshold
 
 
 def home_page():
@@ -38,42 +39,103 @@ def home_page():
                 **{"hx-get": "/api/v1/home/stats", "hx-trigger": "load, every 15s", "hx-swap": "innerHTML"},
             ),
 
+            # Threshold slider
+            Div(
+                Span("RISK THRESHOLD", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;"),
+                Div(
+                    Span(f"{get_risk_threshold():.2f}", id="threshold-value"),
+                    Input(type="range", name="threshold", min="0.05", max="0.9", step="0.05",
+                          value=str(get_risk_threshold()), id="threshold-slider",
+                          oninput="document.getElementById('threshold-value').textContent=parseFloat(this.value).toFixed(2)",
+                          **{"hx-post": "/api/v1/settings/threshold", "hx-target": "#threshold-value",
+                             "hx-trigger": "change", "hx-swap": "outerHTML", "hx-include": "this"}),
+                    id="threshold-control",
+                ),
+                P("Lower the threshold to trigger more alerts for demo purposes.",
+                  style="color: var(--fg-subtle); font-size: 10px; margin-top: 4px;"),
+                style="margin-top: 16px; padding: 12px; border: 1px solid var(--highlight-med); border-radius: 4px; max-width: 360px;",
+            ),
+
             status="LIVE",
             footer_left="REAL-TIME SCORING",
             footer_right="MEMPOOL ACTIVE",
         ),
 
-        # Live scoring feed
-        DiagnosticFrame(
-            "TRANSACTION SCORING FEED",
+        # Scoring feed + alert queue + alert detail — 3 columns on desktop
+        Div(
+            DiagnosticFrame(
+                "SCORING FEED",
 
-            P("Live transactions from the Bitcoin mempool, scored in real-time. "
-              "Rows flash red when risk exceeds the 0.7 threshold. "
-              "Each prediction is logged to the audit trail.",
-              style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+                P("Live mempool transactions scored in real-time.",
+                  style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
 
-            FeedHeader(),
-            Div(
-                id="score-feed",
-                cls="scroll-feed",
-                **{
-                    "hx-ext": "sse",
-                    "sse-connect": "/api/v1/stream/scores",
-                    "sse-swap": "transaction_scored",
-                    "hx-swap": "afterbegin",
-                },
-                style="min-height: 300px;",
+                FeedHeader(),
+                Div(
+                    id="score-feed",
+                    cls="scroll-feed",
+                    **{
+                        "hx-ext": "sse",
+                        "sse-connect": "/api/v1/stream/scores",
+                        "sse-swap": "transaction_scored",
+                        "hx-swap": "afterbegin",
+                    },
+                    style="min-height: 300px;",
+                ),
+
+                Div(
+                    id="prediction-counter",
+                    **{"hx-get": "/api/v1/home/prediction-count", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                    style="text-align: center; margin-top: 20px;",
+                ),
+
+                status="STREAMING",
+                footer_left="AUDIT TRAIL",
+                footer_right="SSE CONNECTED",
             ),
 
-            Div(
-                id="prediction-counter",
-                **{"hx-get": "/api/v1/home/prediction-count", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
-                style="text-align: center; margin-top: 20px;",
+            DiagnosticFrame(
+                "ALERT QUEUE",
+
+                P("Flagged transactions for compliance review.",
+                  style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+                Div(
+                    id="alert-stats",
+                    **{"hx-get": "/api/v1/alerts/stats", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                ),
+
+                Table(
+                    Thead(Tr(
+                        Th("Time"), Th("TX ID"), Th("Score"), Th("Status"), Th(""),
+                    )),
+                    Tbody(
+                        id="alert-feed",
+                        **{"hx-get": "/api/v1/alerts/recent", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                    ),
+                    cls="spark-table",
+                ),
+
+                status="MONITORING",
+                footer_left="COMPLIANCE REVIEW",
+                footer_right="SHAP + LLM",
             ),
 
-            status="STREAMING",
-            footer_left="AUDIT TRAIL",
-            footer_right="SSE CONNECTED",
+            DiagnosticFrame(
+                "ALERT DETAIL",
+
+                Div(
+                    P("Select an alert to view ",
+                      Tip("SHAP"), " explanation and compliance narrative.",
+                      style="color: var(--fg-subtle);"),
+                    id="alert-detail",
+                ),
+
+                status="SELECT_ALERT",
+                footer_left="SHAP + LLM EXPLANATION",
+                footer_right="AUDIT TRAIL",
+            ),
+
+            cls="triple-row",
         ),
 
         # Oscilloscope JS

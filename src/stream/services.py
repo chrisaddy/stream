@@ -18,7 +18,16 @@ import structlog
 
 log = structlog.get_logger()
 
-RISK_THRESHOLD = 0.7
+_risk_threshold = 0.7
+
+
+def get_risk_threshold() -> float:
+    return _risk_threshold
+
+
+def set_risk_threshold(value: float):
+    global _risk_threshold
+    _risk_threshold = max(0.05, min(0.9, value))
 
 
 def _heuristic_risk_score(fee_rate: float, vsize: int, fee: int) -> float:
@@ -98,7 +107,8 @@ async def score_transaction(
     shap_features = _heuristic_explanation(fee_rate, vsize, fee)
 
     inference_ms = (time.time() - start) * 1000
-    risk_label = "HIGH" if risk_score > 0.7 else "MED" if risk_score > 0.4 else "LOW"
+    threshold = get_risk_threshold()
+    risk_label = "HIGH" if risk_score > threshold else "MED" if risk_score > threshold * 0.6 else "LOW"
 
     input_hash = hashlib.sha256(
         json.dumps({"txid": txid, "vsize": vsize, "fee": fee}).encode()

@@ -15,10 +15,10 @@ from stream.app.components import (
     Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge, Tip,
 )
 from stream.app.models import get_model, get_model_card, get_cached_features
-from stream.db import write_in_thread, save_prediction, save_alert, SessionLocal
+from stream.db import write_in_thread, save_prediction, save_alert, save_review, SessionLocal
 from stream.fees.inference import predict_fee
 from stream.onboarding.inference import predict_risk
-from stream.services import score_transaction, RISK_THRESHOLD
+from stream.services import score_transaction, get_risk_threshold, set_risk_threshold
 
 log = structlog.get_logger()
 
@@ -657,6 +657,19 @@ def register_api_routes(rt):
                         "SHAP explanation unavailable — recommend manual review."
                     )
 
+            review_buttons = Div(
+                Button("Mark as True Positive", cls="spark-btn", style="margin-right: 8px;",
+                       **{"hx-post": f"/api/v1/alerts/{tx_id}/review", "hx-target": "#alert-detail",
+                          "hx-vals": '{"verdict":"true_positive"}'}),
+                Button("Mark as False Positive", cls="spark-btn",
+                       **{"hx-post": f"/api/v1/alerts/{tx_id}/review", "hx-target": "#alert-detail",
+                          "hx-vals": '{"verdict":"false_positive"}'}),
+                style="margin-top: 16px;",
+            ) if alert.status == "pending" else Div(
+                Span(f"STATUS: {alert.status.upper()}", style="color: var(--fg-green); font-weight: bold; font-size: 12px; letter-spacing: 1px;"),
+                style="margin-top: 16px; padding: 12px; border: 1px solid var(--fg-dim); text-align: center;",
+            )
+
             return Div(
                 H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
                 DataGrid(
@@ -671,11 +684,7 @@ def register_api_routes(rt):
                     P(narrative_text,
                       style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;"),
                 ),
-                Div(
-                    Button("Mark as True Positive", cls="spark-btn", style="margin-right: 8px;"),
-                    Button("Mark as False Positive", cls="spark-btn"),
-                    style="margin-top: 16px;",
-                ),
+                review_buttons,
             )
 
         # Demo fallback
@@ -701,9 +710,112 @@ def register_api_routes(rt):
                   style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;"),
             ),
             Div(
-                Button("Mark as True Positive", cls="spark-btn", style="margin-right: 8px;"),
-                Button("Mark as False Positive", cls="spark-btn"),
+                Button("Mark as True Positive", cls="spark-btn", style="margin-right: 8px;",
+                       **{"hx-post": f"/api/v1/alerts/{tx_id}/review", "hx-target": "#alert-detail",
+                          "hx-vals": '{"verdict":"true_positive"}'}),
+                Button("Mark as False Positive", cls="spark-btn",
+                       **{"hx-post": f"/api/v1/alerts/{tx_id}/review", "hx-target": "#alert-detail",
+                          "hx-vals": '{"verdict":"false_positive"}'}),
                 style="margin-top: 16px;",
+            ),
+        )
+
+    # === SETTINGS ===
+
+    @rt("/api/v1/settings/threshold", methods=["GET"])
+    def get_threshold():
+        return Span(f"{get_risk_threshold():.2f}", id="threshold-value")
+
+    @rt("/api/v1/settings/threshold", methods=["POST"])
+    async def post_threshold(request):
+        form = await request.form()
+        val = float(form.get("threshold", 0.7))
+        set_risk_threshold(val)
+        return Span(f"{get_risk_threshold():.2f}", id="threshold-value")
+
+    # === REVIEW ===
+
+    @rt("/api/v1/alerts/{tx_id}/review", methods=["POST"])
+    async def review_alert(tx_id: str, request):
+        from stream.models.alerts import AlertRecord
+
+        form = await request.form()
+        verdict = form.get("verdict", "true_positive")
+
+        alert = None
+        try:
+            db = SessionLocal()
+            try:
+                alert = db.query(AlertRecord).filter(AlertRecord.tx_id == tx_id).first()
+                if alert:
+                    alert.status = "reviewed"
+                    db.commit()
+                    # Capture values before closing session
+                    alert_id = alert.alert_id
+                    risk_score = alert.risk_score
+                    risk_label = alert.risk_label
+                    model_name = alert.model_name or "live-heuristic"
+                    shap_data = alert.explanation or []
+                    narrative_text = alert.narrative or ""
+            finally:
+                db.close()
+        except Exception as e:
+            log.warning("review_alert DB error", error=str(e))
+            return Div(P("Error updating alert.", style="color: var(--fg-red);"))
+
+        if alert:
+            # Save review record for real alerts
+            await write_in_thread(save_review, {
+                "alert_id": alert_id,
+                "tx_id": tx_id,
+                "verdict": verdict,
+                "reviewer": "analyst",
+                "risk_score_at_review": risk_score,
+                "threshold_at_review": get_risk_threshold(),
+            })
+
+        verdict_label = "TRUE POSITIVE" if verdict == "true_positive" else "FALSE POSITIVE"
+        verdict_color = "var(--fg-red)" if verdict == "true_positive" else "var(--fg-green)"
+
+        if alert:
+            # SHAP display
+            shap_lines = []
+            if shap_data:
+                for f in shap_data:
+                    val = f.get("shap_value", 0)
+                    color = "var(--fg-red)" if val > 0.1 else "var(--fg-orange)" if val > 0 else "var(--fg-green)"
+                    shap_lines.append(P(f"{f.get('feature', '?')}: {val:+.4f}", style=f"color: {color};"))
+            else:
+                shap_lines.append(P("No SHAP data available.", style="color: var(--fg-dim);"))
+
+            return Div(
+                H4(f"Alert: {tx_id[:16]}...", style="color: var(--fg-green); margin-bottom: 12px;"),
+                DataGrid(
+                    DataReadout("RISK_SCORE", f"{risk_score:.2f}", variant="danger" if risk_score > 0.7 else ""),
+                    DataReadout("MODEL", model_name),
+                    DataReadout("STATUS", "REVIEWED"),
+                ),
+                H4("SHAP Explanation", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                Div(*shap_lines, style="margin-bottom: 16px;"),
+                H4("AI Compliance Narrative", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                Div(P(narrative_text or "No narrative available.",
+                      style="color: var(--fg-white); opacity: 0.9; border-left: 2px solid var(--fg-green); padding-left: 12px;")),
+                Div(
+                    Span(f"VERDICT: {verdict_label}", style=f"color: {verdict_color}; font-weight: bold; font-size: 12px; letter-spacing: 1px;"),
+                    style="margin-top: 16px; padding: 12px; border: 1px solid var(--fg-dim); text-align: center;",
+                ),
+            )
+
+        # Demo fallback — no DB record, just show the verdict confirmation
+        tx_short = f"{tx_id[:4]}...{tx_id[-4:]}" if len(tx_id) > 8 else tx_id
+        return Div(
+            H4(f"Alert: {tx_short}", style="color: var(--fg-green); margin-bottom: 12px;"),
+            DataGrid(
+                DataReadout("STATUS", "REVIEWED"),
+            ),
+            Div(
+                Span(f"VERDICT: {verdict_label}", style=f"color: {verdict_color}; font-weight: bold; font-size: 12px; letter-spacing: 1px;"),
+                style="margin-top: 16px; padding: 12px; border: 1px solid var(--fg-dim); text-align: center;",
             ),
         )
 
@@ -912,13 +1024,13 @@ def register_api_routes(rt):
             "input_hash": scored["input_hash"],
             "risk_score": scored["risk_score"],
             "risk_label": scored["risk_label"],
-            "threshold_used": RISK_THRESHOLD,
+            "threshold_used": get_risk_threshold(),
             "top_shap_features": scored["shap_features"],
             "inference_time_ms": scored["inference_ms"],
         })
 
         # Persist alert if above threshold
-        if scored["risk_score"] > RISK_THRESHOLD:
+        if scored["risk_score"] > get_risk_threshold():
             await write_in_thread(save_alert, {
                 "tx_id": txid,
                 "risk_score": scored["risk_score"],
@@ -980,11 +1092,12 @@ def register_api_routes(rt):
                         result = await score_transaction(txid, vsize, fee)
                         risk_score = result["risk_score"]
                         risk_label = result["risk_label"]
-                        risk_cls = "risk-high" if risk_score > 0.7 else "risk-medium" if risk_score > 0.4 else "risk-low"
+                        thresh = get_risk_threshold()
+                        risk_cls = "risk-high" if risk_score > thresh else "risk-medium" if risk_score > thresh * 0.6 else "risk-low"
 
                         now = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
 
-                        html = f"""<div class="feed-row {'high-risk' if risk_score > 0.7 else ''}">
+                        html = f"""<div class="feed-row {'high-risk' if risk_score > thresh else ''}">
                             <div style="color: var(--fg-dim);">{now}</div>
                             <div style="font-weight: bold;">{txid[:16]}...</div>
                             <div>{vsize} vB</div>
@@ -1003,13 +1116,13 @@ def register_api_routes(rt):
                                 "input_hash": result["input_hash"],
                                 "risk_score": risk_score,
                                 "risk_label": risk_label,
-                                "threshold_used": RISK_THRESHOLD,
+                                "threshold_used": get_risk_threshold(),
                                 "top_shap_features": result["shap_features"],
                                 "inference_time_ms": result["inference_ms"],
                             })
 
                             # Create alert if above threshold
-                            if risk_score > RISK_THRESHOLD:
+                            if risk_score > get_risk_threshold():
                                 await write_in_thread(save_alert, {
                                     "tx_id": txid,
                                     "risk_score": risk_score,
