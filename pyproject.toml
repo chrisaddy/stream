@@ -29,6 +29,7 @@ dependencies = [
     "networkx>=3.4.0",
     # Viz
     "plotly>=6.0.0",
+    "kaleido>=1.0.0",
     # Logging
     "structlog>=24.4.0",
 ]

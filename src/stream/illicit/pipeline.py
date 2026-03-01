@@ -14,6 +14,15 @@ from stream.illicit.xgboost_model import (
     train_xgboost,
 )
 from stream.illicit.evaluate import full_evaluation
+from stream.model_card import (
+    build_model_card,
+    save_model_card,
+    feature_importance_chart,
+    pr_curve_chart,
+    temporal_chart,
+    confusion_matrix_chart,
+    fig_to_png,
+)
 
 log = structlog.get_logger()
 
@@ -118,15 +127,110 @@ def create_artifact(metrics: dict):
     create_markdown_artifact(key="illicit-xgboost-metrics", markdown=markdown)
 
 
+@task(name="build-illicit-model-card")
+def build_card(model, metrics, X_train, X_test, y_train, y_test):
+    """Build model card with full metadata and save to R2."""
+    import numpy as np
+
+    # SHAP feature importance
+    explainer = get_shap_explainer(model)
+    fi = get_global_feature_importance(explainer, X_test, max_samples=500)
+
+    # Confusion matrix from cost-sensitive threshold
+    threshold = metrics["cost_analysis"]["threshold"]
+    y_prob = model.predict_proba(X_test)[:, 1]
+    preds = (y_prob >= threshold).astype(int)
+    tp = int(((y_test == 1) & (preds == 1)).sum())
+    fp = int(((y_test == 0) & (preds == 1)).sum())
+    fn = int(((y_test == 1) & (preds == 0)).sum())
+    tn = int(((y_test == 0) & (preds == 0)).sum())
+
+    card = build_model_card(
+        name="illicit-xgboost",
+        description="XGBoost classifier for illicit Bitcoin transaction detection. "
+                    "Uses 166 transaction-level features from the Elliptic dataset.",
+        metrics={
+            "pr_auc": metrics["pr_auc"],
+            "cost_analysis": metrics["cost_analysis"],
+            "confusion_matrix": {"tp": tp, "fp": fp, "fn": fn, "tn": tn},
+        },
+        data_summary={
+            "dataset": "Elliptic Bitcoin",
+            "n_features": int(X_train.shape[1]),
+            "train_samples": len(X_train),
+            "test_samples": len(X_test),
+            "train_illicit": int(y_train.sum()),
+            "test_illicit": int(y_test.sum()),
+            "class_ratio": metrics["class_ratio"],
+        },
+        training_params={
+            "model": "XGBClassifier",
+            "n_estimators": 500,
+            "max_depth": 6,
+            "learning_rate": 0.1,
+            "early_stopping_rounds": 20,
+            "best_iteration": model.best_iteration,
+        },
+        feature_importance=fi[:20],
+        curves={
+            "pr_curve": metrics.get("pr_curve", {}),
+            "temporal": metrics.get("temporal", []),
+        },
+    )
+
+    save_model_card(card, "illicit-xgboost")
+    log.info("Illicit model card saved")
+    return card
+
+
+@task(name="create-illicit-chart-artifacts")
+def create_chart_artifacts(card: dict):
+    """Create Prefect image artifacts for key charts."""
+    try:
+        from prefect.artifacts import create_image_artifact
+
+        # PR curve
+        pr = card["curves"].get("pr_curve", {})
+        if pr.get("precision") and pr.get("recall"):
+            fig = pr_curve_chart(pr["precision"], pr["recall"])
+            create_image_artifact(fig_to_png(fig), key="illicit-pr-curve")
+
+        # Feature importance
+        fi = card.get("feature_importance", [])
+        if fi:
+            names = [f["feature"] for f in fi]
+            scores = [f["importance"] for f in fi]
+            fig = feature_importance_chart(names, scores)
+            create_image_artifact(fig_to_png(fig), key="illicit-feature-importance")
+
+        # Temporal stability
+        temporal = card["curves"].get("temporal", [])
+        if temporal:
+            fig = temporal_chart(temporal)
+            create_image_artifact(fig_to_png(fig), key="illicit-temporal-stability")
+
+        # Confusion matrix
+        cm = card["metrics"].get("confusion_matrix", {})
+        if cm:
+            fig = confusion_matrix_chart(cm["tp"], cm["fp"], cm["fn"], cm["tn"])
+            create_image_artifact(fig_to_png(fig), key="illicit-confusion-matrix")
+
+        log.info("Illicit chart artifacts created")
+    except Exception as e:
+        log.warning("Chart artifact creation failed", error=str(e))
+
+
 @flow(name="illicit-detection-training")
 def train_illicit_pipeline():
-    """Full training pipeline: load → split → train → evaluate → save."""
+    """Full training pipeline: load → split → train → evaluate → save → card."""
     features, labels, timesteps = load_dataset()
     X_train, y_train, X_test, y_test = split_data(features, labels, timesteps)
     model = train_model(X_train, y_train, X_test, y_test)
     metrics = evaluate_model(model, X_test, y_test, timesteps, labels)
     save_model_to_r2(model)
     create_artifact(metrics)
+    card = build_card(model, metrics, X_train, X_test, y_train, y_test)
+    create_chart_artifacts(card)
     return metrics
 
 

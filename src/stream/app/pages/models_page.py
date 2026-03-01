@@ -1,90 +1,231 @@
-"""Model Cards page with ROI calculator."""
+"""Model Cards page with dynamic data from R2 and Plotly charts."""
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DiagnosticFrame, MetricItem, MetricsRow, Page,
+    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page,
 )
+from stream.app.models import get_all_model_cards
 
 
-def _model_card(name, description, architecture, data_desc, loss, assumptions, live_stats_endpoint):
-    return Card(name,
-        P(description, style="margin-bottom: 12px; color: var(--fg-white); opacity: 0.85;"),
+# Fallback descriptions when no card exists in R2
+_FALLBACK_CARDS = {
+    "illicit-xgboost": {
+        "name": "illicit-xgboost",
+        "description": "XGBoost classifier for illicit Bitcoin transaction detection.",
+    },
+    "onboarding-xgb": {
+        "name": "onboarding-xgb",
+        "description": "Calibrated XGBoost for KYC onboarding risk scoring.",
+    },
+    "fee-lgbm": {
+        "name": "fee-lgbm",
+        "description": "LightGBM fee estimator for optimal sat/vB prediction.",
+    },
+    "lightning-lgbm": {
+        "name": "lightning-lgbm",
+        "description": "LightGBM regressor for Lightning node capacity prediction.",
+    },
+}
 
-        Div(
-            H4("Architecture", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
-            P(architecture, style="font-size: 12px; margin-bottom: 12px;"),
 
-            H4("Training Data", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
-            P(data_desc, style="font-size: 12px; margin-bottom: 12px;"),
+def _fmt(val, fmt=".4f"):
+    """Format a numeric value, or return '—' if missing."""
+    if val is None:
+        return "—"
+    if isinstance(val, float):
+        return f"{val:{fmt}}"
+    return str(val)
 
-            H4("Loss Function", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
-            P(loss, style="font-size: 12px; margin-bottom: 12px;"),
 
-            H4("Assumptions & Limitations", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
-            P(assumptions, style="font-size: 12px; margin-bottom: 12px;"),
-        ),
+def _metrics_table(metrics: dict, model_name: str):
+    """Render a metrics table based on model type."""
+    if not metrics:
+        return P("No metrics available. Run the training pipeline.", style="color: var(--fg-dim);")
 
-        # Live stats from Prefect
-        Div(
-            H4("Live Stats", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;"),
-            Div(id=f"stats-{name.lower().replace(' ', '-')}",
-                **{"hx-get": live_stats_endpoint, "hx-trigger": "load", "hx-swap": "innerHTML"},
-                style="min-height: 40px;"),
-        ),
+    if model_name == "illicit-xgboost":
+        cost = metrics.get("cost_analysis", {})
+        return Table(
+            Thead(Tr(Th("Metric"), Th("Value"))),
+            Tbody(
+                Tr(Td("PR-AUC"), Td(_fmt(metrics.get("pr_auc")), style="color: var(--fg-green);")),
+                Tr(Td("Threshold"), Td(_fmt(cost.get("threshold"), ".3f"))),
+                Tr(Td("Precision"), Td(_fmt(cost.get("precision"), ".3f"))),
+                Tr(Td("Recall"), Td(_fmt(cost.get("recall"), ".3f"))),
+                Tr(Td("F1"), Td(_fmt(cost.get("f1"), ".3f"))),
+                Tr(Td("Total Cost"), Td(f"${cost.get('total_cost', 0):,.0f}")),
+            ),
+            cls="spark-table",
+        )
+
+    if model_name == "onboarding-xgb":
+        lr = metrics.get("logistic_regression", {})
+        xgb = metrics.get("calibrated_xgboost", {})
+        return Table(
+            Thead(Tr(Th("Metric"), Th("Logistic"), Th("XGBoost"))),
+            Tbody(
+                Tr(Td("Accuracy"), Td(_fmt(lr.get("accuracy"))), Td(_fmt(xgb.get("accuracy")), style="color: var(--fg-green);")),
+                Tr(Td("F1 (macro)"), Td(_fmt(lr.get("f1_macro"))), Td(_fmt(xgb.get("f1_macro")), style="color: var(--fg-green);")),
+                Tr(Td("Log Loss"), Td(_fmt(lr.get("log_loss"))), Td(_fmt(xgb.get("log_loss")), style="color: var(--fg-green);")),
+            ),
+            cls="spark-table",
+        )
+
+    if model_name == "fee-lgbm":
+        return Table(
+            Thead(Tr(Th("Metric"), Th("Value"))),
+            Tbody(
+                Tr(Td("MAE"), Td(f"{_fmt(metrics.get('mae'))} sat/vB", style="color: var(--fg-green);")),
+                Tr(Td("RMSE"), Td(f"{_fmt(metrics.get('rmse'))} sat/vB")),
+                Tr(Td("MAPE"), Td(_fmt(metrics.get("mape")))),
+                Tr(Td("Median AE"), Td(f"{_fmt(metrics.get('median_ae'))} sat/vB")),
+            ),
+            cls="spark-table",
+        )
+
+    if model_name == "lightning-lgbm":
+        return Table(
+            Thead(Tr(Th("Metric"), Th("Value"))),
+            Tbody(
+                Tr(Td("MAE"), Td(_fmt(metrics.get("mae"), ".2f"), style="color: var(--fg-green);")),
+                Tr(Td("R²"), Td(_fmt(metrics.get("r2")))),
+                Tr(Td("Median AE"), Td(_fmt(metrics.get("median_ae"), ".2f"))),
+                Tr(Td("Samples"), Td(str(metrics.get("n_samples", "—")))),
+            ),
+            cls="spark-table",
+        )
+
+    return P("Unknown model type", style="color: var(--fg-dim);")
+
+
+def _data_summary(data: dict):
+    """Render data summary section."""
+    if not data:
+        return None
+
+    items = []
+    for key, val in data.items():
+        if key == "feature_names":
+            continue  # Skip raw feature names
+        if isinstance(val, dict):
+            for k, v in val.items():
+                items.append(DataReadout(f"{key}/{k}".upper(), str(v)))
+        else:
+            items.append(DataReadout(key.upper().replace("_", " "), str(val)))
+
+    if not items:
+        return None
+    return Div(
+        H4("Training Data", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;"),
+        DataGrid(*items[:6]),
+        style="margin-bottom: 12px;",
     )
 
 
+def _chart_section(model_name: str, card: dict):
+    """Render chart placeholders with HTMX lazy loading."""
+    chart_types = {
+        "illicit-xgboost": ["pr_curve", "feature_importance", "confusion_matrix", "temporal"],
+        "onboarding-xgb": ["calibration", "feature_importance"],
+        "fee-lgbm": ["feature_importance"],
+        "lightning-lgbm": ["feature_importance"],
+    }
+
+    charts = chart_types.get(model_name, [])
+    if not charts:
+        return None
+
+    divs = []
+    for chart_type in charts:
+        label = chart_type.replace("_", " ").title()
+        divs.append(
+            Div(
+                H4(label, style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
+                Div(
+                    id=f"chart-{model_name}-{chart_type}",
+                    **{"hx-get": f"/api/v1/models/{model_name}/chart/{chart_type}", "hx-trigger": "load", "hx-swap": "innerHTML"},
+                    style="min-height: 300px; display: flex; align-items: center; justify-content: center;",
+                ),
+                style="margin-bottom: 16px;",
+            )
+        )
+
+    return Div(*divs)
+
+
+def _model_card(model_name: str, card: dict):
+    """Render a single model card from card data."""
+    description = card.get("description", "")
+    created = card.get("created_at", "")
+    if created:
+        created = created[:19].replace("T", " ")  # Trim to readable format
+
+    metrics = card.get("metrics", {})
+    data = card.get("data_summary", {})
+    params = card.get("training_params", {})
+
+    children = [
+        P(description, style="margin-bottom: 12px; color: var(--fg-white); opacity: 0.85;"),
+    ]
+
+    if created:
+        children.append(
+            P(f"Last trained: {created} UTC", style="color: var(--fg-dim); font-size: 10px; margin-bottom: 12px;")
+        )
+
+    # Data summary
+    ds = _data_summary(data)
+    if ds:
+        children.append(ds)
+
+    # Training params
+    if params:
+        param_str = " | ".join(f"{k}: {v}" for k, v in list(params.items())[:4])
+        children.append(
+            Div(
+                H4("Training Config", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
+                P(param_str, style="font-size: 11px; color: var(--fg-dim);"),
+                style="margin-bottom: 12px;",
+            )
+        )
+
+    # Metrics table
+    children.append(
+        Div(
+            H4("Metrics", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;"),
+            _metrics_table(metrics, model_name),
+            style="margin-bottom: 12px;",
+        )
+    )
+
+    # Charts
+    charts = _chart_section(model_name, card)
+    if charts:
+        children.append(charts)
+
+    return Card(card.get("name", model_name), *children)
+
+
 def models_page():
+    cards = get_all_model_cards()
+    model_names = ["illicit-xgboost", "onboarding-xgb", "fee-lgbm", "lightning-lgbm"]
+
+    card_elements = []
+    for name in model_names:
+        card_data = cards.get(name, _FALLBACK_CARDS.get(name, {"name": name, "description": ""}))
+        card_elements.append(_model_card(name, card_data))
+
     return Page("Model Cards", "/models",
         DiagnosticFrame(
             "MODEL REGISTRY",
 
-            Div(
-                _model_card(
-                    "Illicit XGBoost",
-                    "Detects illicit Bitcoin transactions using 166 transaction-level features. Production workhorse for real-time scoring.",
-                    "An ensemble of decision trees that each learn to correct the mistakes of the previous tree. Think of it as a committee of experts voting on whether a transaction looks suspicious.",
-                    "Elliptic Bitcoin Dataset: ~200K transactions across 49 timesteps, 166 features (1 timestep + 93 local transaction features + 72 aggregated neighbor features). ~10:1 class imbalance (licit vs illicit).",
-                    "Binary cross-entropy with class weighting: we penalize missing an illicit transaction 10x more than falsely flagging a legitimate one, because the regulatory cost of a miss far exceeds the customer friction of a false alarm.",
-                    "The Elliptic dataset covers transactions from 2018-2019. The model assumes illicit patterns are relatively stable — temporal evaluation on held-out timesteps tests this assumption.",
-                    "/api/v1/models/stats/illicit-xgboost",
-                ),
-                _model_card(
-                    "Illicit GCN",
-                    "Graph Convolutional Network that leverages Bitcoin's transaction graph structure. Sees payment flows between transactions, not just individual features.",
-                    "A neural network that looks not just at a transaction, but at the transactions it's connected to. It learns patterns in the flow of Bitcoin between addresses — 3 GCN layers (165->128->128->2).",
-                    "Same Elliptic dataset, but uses the edge index (transaction graph) in addition to node features.",
-                    "Class-weighted cross-entropy with temporal train/validation masks.",
-                    "Graph convolutions aggregate over 1-hop neighbors per layer (3 layers = 3-hop receptive field). Very large or disconnected subgraphs may not propagate information effectively.",
-                    "/api/v1/models/stats/illicit-gcn",
-                ),
-                _model_card(
-                    "Fee LightGBM",
-                    "Predicts optimal fee rate (sat/vB) for different confirmation targets using live mempool state.",
-                    "Similar to XGBoost but optimized for speed. Uses histogram-based splitting to handle the high-dimensional mempool data.",
-                    "Live mempool snapshots from mempool.space API: mempool size, fee distributions, projected blocks, time features.",
-                    "MAE (L1) objective — robust to fee spikes that would distort MSE-based models.",
-                    "Fee estimation in a non-stationary environment. Requires frequent retraining as mempool dynamics evolve. Model is blind to external events (halvings, protocol changes).",
-                    "/api/v1/models/stats/fee-lgbm",
-                ),
-                _model_card(
-                    "Onboarding XGBoost",
-                    "Calibrated risk scoring for new customer onboarding. Platt-scaled probabilities for meaningful risk tiers.",
-                    "XGBoost with Platt scaling (sigmoid calibration) so that predicted probabilities match actual risk rates. A 0.8 score means ~80% chance of being high-risk.",
-                    "Synthetic KYC dataset: 10K records with realistic distributions of email type, phone verification, document scores, IP matching, transaction velocity.",
-                    "Multi-class cross-entropy with balanced class weights + post-hoc Platt scaling.",
-                    "Trained on synthetic data — real-world distributions would differ. Demonstrates the pattern, not production-ready without real data.",
-                    "/api/v1/models/stats/onboarding-xgb",
-                ),
-                cls="card-grid",
-            ),
+            Div(*card_elements, cls="card-grid"),
 
-            status="4 MODELS",
+            status=f"{len(cards)} CARDS LOADED" if cards else "NO CARDS",
             footer_left="[MOD-001] DOCUMENTATION",
             footer_right="R2_BACKED",
         ),
 
-        # ROI Calculator
+        # ROI Calculator (kept as-is)
         DiagnosticFrame(
             "ROI CALCULATOR",
 

@@ -14,7 +14,7 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge,
 )
-from stream.app.models import get_model
+from stream.app.models import get_model, get_model_card
 from stream.db import write_in_thread, save_prediction, save_alert, SessionLocal
 from stream.services import score_transaction, RISK_THRESHOLD
 
@@ -486,6 +486,71 @@ def register_api_routes(rt):
             MetricItem("FRESHNESS", "FRESH"),
             MetricItem("PREDICTIONS", "1,247"),
             MetricItem("AVG_LATENCY", "2.3ms"),
+        )
+
+    @rt("/api/v1/models/{model_name}/chart/{chart_type}")
+    def model_chart(model_name: str, chart_type: str):
+        """Return Plotly chart HTML for a model card chart."""
+        from stream.model_card import (
+            pr_curve_chart, feature_importance_chart, calibration_chart,
+            confusion_matrix_chart, temporal_chart,
+        )
+
+        card = get_model_card(model_name)
+        if not card:
+            return P("No model card data. Run the training pipeline first.",
+                     style="color: var(--fg-dim); font-size: 11px;")
+
+        fig = None
+        try:
+            if chart_type == "feature_importance":
+                fi = card.get("feature_importance", [])
+                if fi:
+                    names = [f["feature"] for f in fi]
+                    scores = [f["importance"] for f in fi]
+                    fig = feature_importance_chart(names, scores)
+
+            elif chart_type == "pr_curve":
+                pr = card.get("curves", {}).get("pr_curve", {})
+                if pr.get("precision") and pr.get("recall"):
+                    fig = pr_curve_chart(pr["precision"], pr["recall"])
+
+            elif chart_type == "confusion_matrix":
+                cm = card.get("metrics", {}).get("confusion_matrix", {})
+                if cm:
+                    fig = confusion_matrix_chart(cm["tp"], cm["fp"], cm["fn"], cm["tn"])
+
+            elif chart_type == "temporal":
+                temporal = card.get("curves", {}).get("temporal", [])
+                if temporal:
+                    fig = temporal_chart(temporal)
+
+            elif chart_type == "calibration":
+                cal = card.get("curves", {}).get("calibration", {})
+                # Use first class found
+                for cls_key, cls_data in cal.items():
+                    if cls_data.get("prob_true") and cls_data.get("prob_pred"):
+                        fig = calibration_chart(cls_data["prob_true"], cls_data["prob_pred"], cls_key)
+                        break
+
+        except Exception as e:
+            log.warning("Chart generation failed", model=model_name, chart=chart_type, error=str(e))
+            return P(f"Chart error: {e}", style="color: var(--fg-red); font-size: 11px;")
+
+        if fig is None:
+            return P(f"No data for {chart_type.replace('_', ' ')} chart.",
+                     style="color: var(--fg-dim); font-size: 11px;")
+
+        # Return Plotly JSON rendered client-side
+        chart_json = fig.to_json()
+        div_id = f"plotly-{model_name}-{chart_type}"
+        return Div(
+            Div(id=div_id, style="width: 100%; height: 350px;"),
+            Script(src="https://cdn.plot.ly/plotly-2.35.2.min.js"),
+            Script(f"""(function() {{
+                var spec = {chart_json};
+                Plotly.newPlot('{div_id}', spec.data, spec.layout, {{responsive: true, displayModeBar: false}});
+            }})();"""),
         )
 
     @rt("/api/v1/models/roi", methods=["POST"])

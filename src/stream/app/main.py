@@ -3,7 +3,7 @@
 import structlog
 from fasthtml.common import *
 
-from stream.app.models import load_all_models
+from stream.app.models import load_all_models, load_model_cards
 from stream.db import engine
 from stream.models.base import Base
 from stream.models.predictions import PredictionRecord  # noqa: F401 — register table
@@ -42,6 +42,12 @@ async def on_startup():
         load_all_models()
     except Exception as e:
         log.warning("Model loading failed on startup", error=str(e))
+
+    # 3. Load model cards
+    try:
+        load_model_cards()
+    except Exception as e:
+        log.warning("Model card loading failed on startup", error=str(e))
 
 
 # Create FastHTML app with static file serving
