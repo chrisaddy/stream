@@ -4,6 +4,7 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, DiagnosticFrame, Page,
 )
+from stream.app.pages.models_page import render_model_card
 
 
 def lightning_page():
@@ -70,4 +71,6 @@ def lightning_page():
             footer_left="[LN-003] SCORING",
             footer_right="ENTER_PUBKEY",
         ),
+
+        render_model_card("lightning-lgbm"),
     )

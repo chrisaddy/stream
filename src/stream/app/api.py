@@ -450,6 +450,36 @@ def register_api_routes(rt):
 
     # === ALERTS ===
 
+    @rt("/api/v1/alerts/stats")
+    def alert_stats():
+        from stream.models.alerts import AlertRecord
+        from sqlalchemy import func
+
+        try:
+            db = SessionLocal()
+            try:
+                pending = db.query(func.count()).filter(AlertRecord.status == "pending").scalar() or 0
+                reviewed = db.query(func.count()).filter(AlertRecord.status == "reviewed").scalar() or 0
+                escalated = db.query(func.count()).filter(AlertRecord.status == "escalated").scalar() or 0
+                total = pending + reviewed + escalated
+            finally:
+                db.close()
+
+            return DataGrid(
+                DataReadout("TOTAL_ALERTS", str(total), highlight=True),
+                DataReadout("PENDING", str(pending), variant="warning" if pending > 0 else ""),
+                DataReadout("REVIEWED", str(reviewed)),
+                DataReadout("ESCALATED", str(escalated), variant="danger" if escalated > 0 else ""),
+            )
+        except Exception as e:
+            log.debug("Alert stats query failed", error=str(e))
+            return DataGrid(
+                DataReadout("TOTAL_ALERTS", "—"),
+                DataReadout("PENDING", "—"),
+                DataReadout("REVIEWED", "—"),
+                DataReadout("ESCALATED", "—"),
+            )
+
     @rt("/api/v1/alerts/recent")
     def recent_alerts():
         from stream.models.alerts import AlertRecord

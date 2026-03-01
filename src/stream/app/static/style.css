@@ -1,17 +1,25 @@
-/* Spark Diagnostic Theme — Dark Terminal Aesthetic */
+/* Rosé Pine Moon Theme */
 :root {
-    --bg-color: #080808;
-    --bg-surface: #0a0a0a;
-    --fg-white: #e0e0e0;
-    --fg-green: #33ff77;
-    --fg-dim: #444444;
-    --fg-red: #ff4444;
-    --fg-orange: #ff8844;
-    --fg-yellow: #ffcc33;
-    --fg-cyan: #44ccff;
-    --grid-line: rgba(255, 255, 255, 0.05);
-    --glow-green: rgba(51, 255, 119, 0.4);
-    --row-hover: rgba(51, 255, 119, 0.05);
+    --bg-color: #232136;
+    --bg-surface: #2a273f;
+    --bg-overlay: #393552;
+    --fg-white: #e0def4;
+    --fg-green: #9ccfd8;
+    --fg-dim: #6e6a86;
+    --fg-red: #eb6f92;
+    --fg-orange: #f6c177;
+    --fg-yellow: #f6c177;
+    --fg-cyan: #9ccfd8;
+    --fg-subtle: #908caa;
+    --fg-iris: #c4a7e7;
+    --fg-rose: #ea9a97;
+    --fg-pine: #3e8fb0;
+    --highlight-low: #2a283e;
+    --highlight-med: #44415a;
+    --highlight-high: #56526e;
+    --grid-line: rgba(224, 222, 244, 0.04);
+    --glow-green: rgba(156, 207, 216, 0.3);
+    --row-hover: rgba(156, 207, 216, 0.06);
     --font-mono: 'Courier New', Courier, monospace;
 }
 
@@ -55,6 +63,11 @@ a:hover { text-decoration: underline; }
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.nav-sidebar > * {
+    flex-shrink: 0;
 }
 
 .nav-brand {
@@ -174,7 +187,7 @@ a:hover { text-decoration: underline; }
 /* Scan line animation */
 .scan-line {
     position: absolute; width: 100%; height: 1px;
-    background: rgba(51, 255, 119, 0.08);
+    background: rgba(156, 207, 216, 0.06);
     animation: scan 8s linear infinite;
     pointer-events: none;
 }
@@ -231,9 +244,9 @@ a:hover { text-decoration: underline; }
     animation: pulse 2s infinite;
 }
 @keyframes pulse {
-    0% { opacity: 1; box-shadow: 0 0 0 0 rgba(51,255,119,0.7); }
-    70% { opacity: 0.5; box-shadow: 0 0 0 10px rgba(51,255,119,0); }
-    100% { opacity: 1; box-shadow: 0 0 0 0 rgba(51,255,119,0); }
+    0% { opacity: 1; box-shadow: 0 0 0 0 rgba(156,207,216,0.7); }
+    70% { opacity: 0.5; box-shadow: 0 0 0 10px rgba(156,207,216,0); }
+    100% { opacity: 1; box-shadow: 0 0 0 0 rgba(156,207,216,0); }
 }
 
 /* Tables */
@@ -246,7 +259,7 @@ a:hover { text-decoration: underline; }
 }
 .spark-table td {
     padding: 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(224, 222, 244, 0.05);
 }
 .spark-table tr:hover { background: var(--row-hover); }
 
@@ -265,7 +278,7 @@ a:hover { text-decoration: underline; }
     display: grid;
     grid-template-columns: 100px 140px 80px 80px 80px 1fr;
     padding: 8px 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(224, 222, 244, 0.03);
     font-size: 11px;
     align-items: center;
     transition: background 0.3s;
@@ -275,7 +288,7 @@ a:hover { text-decoration: underline; }
     animation: risk-flash 1s ease-out;
 }
 @keyframes risk-flash {
-    0% { background: rgba(255, 68, 68, 0.2); }
+    0% { background: rgba(235, 111, 146, 0.2); }
     100% { background: transparent; }
 }
 
@@ -288,11 +301,11 @@ a:hover { text-decoration: underline; }
 .counter-box {
     border: 1px solid var(--fg-green);
     padding: 12px 20px;
-    background: rgba(0, 20, 5, 0.8);
+    background: rgba(42, 39, 63, 0.8);
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    box-shadow: 0 0 15px rgba(51, 255, 119, 0.1);
+    box-shadow: 0 0 15px rgba(156, 207, 216, 0.1);
 }
 .counter-label { font-size: 9px; color: var(--fg-white); letter-spacing: 1px; margin-bottom: 4px; }
 .counter-value { font-size: 28px; color: var(--fg-green); letter-spacing: 2px; }
@@ -302,7 +315,7 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--fg-dim);
     margin-bottom: 20px;
     padding: 20px;
-    background: rgba(255,255,255,0.02);
+    background: rgba(57, 53, 82, 0.3);
 }
 .walkthrough-section h3 {
     color: var(--fg-green);
@@ -436,7 +449,7 @@ canvas.oscilloscope {
     display: block;
     width: 100%;
     height: 200px;
-    filter: drop-shadow(0 0 4px rgba(51, 255, 119, 0.4));
+    filter: drop-shadow(0 0 4px rgba(156, 207, 216, 0.4));
 }
 
 /* Responsive */

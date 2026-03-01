@@ -99,7 +99,7 @@ def home_page():
 
                 ctx.beginPath();
                 ctx.lineWidth = 2;
-                ctx.strokeStyle = '#33ff77';
+                ctx.strokeStyle = '#9ccfd8';
                 ctx.moveTo(cx, cy);
                 ctx.lineTo(width, cy);
                 ctx.stroke();

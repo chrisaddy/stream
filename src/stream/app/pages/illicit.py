@@ -4,6 +4,7 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, WalkthroughSection,
 )
+from stream.app.pages.models_page import render_model_card
 
 
 def illicit_page():
@@ -109,4 +110,6 @@ def illicit_page():
             footer_left="[ILL-003] COST-SENSITIVE",
             footer_right="FN >> FP",
         ),
+
+        render_model_card("illicit-xgboost"),
     )

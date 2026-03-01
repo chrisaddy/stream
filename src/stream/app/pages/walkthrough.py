@@ -186,40 +186,4 @@ end""",
     )
 
 
-def walkthrough_integration():
-    return Page("Integration", "/walkthrough/integration",
-        DiagnosticFrame(
-            "INTEGRATION ARCHITECTURE",
-
-            WalkthroughSection(
-                "API Contract",
-                "The scoring endpoint accepts a JSON payload with transaction features and returns a risk assessment with all fields an Elixir GenServer would need to route the transaction: risk score, label, SHAP explanation, compliance narrative, audit ID, and recommended action.",
-            ),
-
-            P("Test the integration endpoint:", style="color: var(--fg-dim); margin-bottom: 12px;"),
-
-            Form(
-                Textarea(
-                    '{"features": [0.5, -0.3, 1.2], "correlation_id": "test-001"}',
-                    name="payload",
-                    cls="spark-input",
-                    style="height: 80px; resize: none; margin-bottom: 12px;",
-                ),
-                Button("Send Webhook", cls="spark-btn", type="submit"),
-                **{"hx-post": "/api/v1/integration/webhook", "hx-target": "#webhook-result"},
-            ),
-
-            Div(id="webhook-result", style="margin-top: 16px;"),
-
-            WalkthroughSection(
-                "AMQP Flow",
-                "In production at River: Transaction arrives via Elixir -> Published to AMQP scoring queue -> ML service consumes message -> Scores transaction -> Publishes result to response queue -> Elixir GenServer picks up risk score and routes accordingly (auto-clear, flag for review, or block).",
-            ),
-
-            status="LIVE_API",
-            footer_left="[WLK-005] WEBHOOK",
-            footer_right="ELIXIR_COMPAT",
-        ),
-    )
-
 

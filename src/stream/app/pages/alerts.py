@@ -11,11 +11,9 @@ def alerts_page():
         DiagnosticFrame(
             "COMPLIANCE ALERT QUEUE",
 
-            DataGrid(
-                DataReadout("PENDING_ALERTS", "0", variant="warning"),
-                DataReadout("REVIEWED_TODAY", "0"),
-                DataReadout("AUTO_CLEARED", "0", highlight=True),
-                DataReadout("ESCALATED", "0", variant="danger"),
+            Div(
+                id="alert-stats",
+                **{"hx-get": "/api/v1/alerts/stats", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
             ),
 
             # Alert feed

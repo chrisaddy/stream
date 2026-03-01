@@ -55,10 +55,9 @@ def test_walkthrough_page(client):
     assert "WALKTHROUGH" in resp.text
 
 
-def test_models_page(client):
+def test_models_page_removed(client):
     resp = client.get("/models")
-    assert resp.status_code == 200
-    assert "MODEL" in resp.text
+    assert resp.status_code == 404
 
 
 def test_pipeline_page(client):

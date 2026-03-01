@@ -9,20 +9,20 @@ import structlog
 
 log = structlog.get_logger()
 
-# Terminal-themed Plotly layout
+# Rosé Pine Moon — Plotly layout
 _LAYOUT = dict(
-    paper_bgcolor="#080808",
-    plot_bgcolor="#080808",
-    font=dict(family="monospace", color="#33ff77", size=11),
+    paper_bgcolor="#232136",
+    plot_bgcolor="#232136",
+    font=dict(family="monospace", color="#e0def4", size=11),
     margin=dict(l=50, r=20, t=40, b=40),
-    xaxis=dict(gridcolor="#1a1a1a", zerolinecolor="#1a1a1a"),
-    yaxis=dict(gridcolor="#1a1a1a", zerolinecolor="#1a1a1a"),
+    xaxis=dict(gridcolor="#393552", zerolinecolor="#393552"),
+    yaxis=dict(gridcolor="#393552", zerolinecolor="#393552"),
 )
 
-GREEN = "#33ff77"
-RED = "#ff3344"
-AMBER = "#ffaa33"
-DIM = "#666666"
+GREEN = "#9ccfd8"   # Foam
+RED = "#eb6f92"     # Love
+AMBER = "#f6c177"   # Gold
+DIM = "#6e6a86"     # Muted
 
 
 def build_model_card(
@@ -161,8 +161,8 @@ def confusion_matrix_chart(tp: int, fp: int, fn: int, tn: int) -> go.Figure:
     text = [[f"{labels[i][j]}<br>{z[i][j]:,}" for j in range(2)] for i in range(2)]
     fig = go.Figure(go.Heatmap(
         z=z, x=["Predicted Neg", "Predicted Pos"], y=["Actual Neg", "Actual Pos"],
-        text=text, texttemplate="%{text}", textfont=dict(size=14, color="#080808"),
-        colorscale=[[0, "#1a1a1a"], [1, GREEN]], showscale=False,
+        text=text, texttemplate="%{text}", textfont=dict(size=14, color="#232136"),
+        colorscale=[[0, "#393552"], [1, GREEN]], showscale=False,
     ))
     fig.update_layout(**_LAYOUT, title="Confusion Matrix")
     return fig

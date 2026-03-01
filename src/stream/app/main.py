@@ -14,14 +14,12 @@ from stream.app.pages.fees import fees_page
 from stream.app.pages.lightning import lightning_page
 from stream.app.pages.onboarding import onboarding_page
 from stream.app.pages.alerts import alerts_page
-from stream.app.pages.models_page import models_page
 from stream.app.pages.pipeline import pipeline_page
 from stream.app.pages.walkthrough import (
     walkthrough_overview,
     walkthrough_illicit,
     walkthrough_fees,
     walkthrough_architecture,
-    walkthrough_integration,
 )
 from stream.app.api import register_api_routes
 
@@ -100,11 +98,6 @@ def alerts():
     return alerts_page()
 
 
-@rt("/models")
-def models():
-    return models_page()
-
-
 @rt("/pipeline")
 def pipeline():
     return pipeline_page()
@@ -128,11 +121,6 @@ def walkthrough_fees_page():
 @rt("/walkthrough/architecture")
 def walkthrough_arch():
     return walkthrough_architecture()
-
-
-@rt("/walkthrough/integration")
-def walkthrough_integ():
-    return walkthrough_integration()
 
 
 # Run with: uvicorn stream.app.main:app --host 0.0.0.0 --port 5000

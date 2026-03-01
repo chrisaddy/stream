@@ -4,6 +4,7 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, DiagnosticFrame, Page,
 )
+from stream.app.pages.models_page import render_model_card
 
 
 def onboarding_page():
@@ -89,4 +90,6 @@ def onboarding_page():
             footer_left="[ONB-002] CALIBRATION",
             footer_right="PLATT_SCALING",
         ),
+
+        render_model_card("onboarding-xgb"),
     )

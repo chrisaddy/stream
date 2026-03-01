@@ -4,6 +4,7 @@ from fasthtml.common import *
 from stream.app.components import (
     Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page,
 )
+from stream.app.pages.models_page import render_model_card
 
 
 def fees_page():
@@ -62,4 +63,6 @@ def fees_page():
             footer_left="[FEE-003] LIVE DATA",
             footer_right="MEMPOOL.SPACE",
         ),
+
+        render_model_card("fee-lgbm"),
     )

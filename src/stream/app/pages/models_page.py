@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page,
+    Card, DataGrid, DataReadout, DiagnosticFrame,
 )
 from stream.app.models import get_all_model_cards
 
@@ -205,65 +205,14 @@ def _model_card(model_name: str, card: dict):
     return Card(card.get("name", model_name), *children)
 
 
-def models_page():
+def render_model_card(name: str):
+    """Render a model card DiagnosticFrame for embedding in a model page."""
     cards = get_all_model_cards()
-    model_names = ["illicit-xgboost", "onboarding-xgb", "fee-lgbm", "lightning-lgbm"]
-
-    card_elements = []
-    for name in model_names:
-        card_data = cards.get(name, _FALLBACK_CARDS.get(name, {"name": name, "description": ""}))
-        card_elements.append(_model_card(name, card_data))
-
-    return Page("Model Cards", "/models",
-        DiagnosticFrame(
-            "MODEL REGISTRY",
-
-            Div(*card_elements, cls="card-grid"),
-
-            status=f"{len(cards)} CARDS LOADED" if cards else "NO CARDS",
-            footer_left="[MOD-001] DOCUMENTATION",
-            footer_right="R2_BACKED",
-        ),
-
-        # ROI Calculator (kept as-is)
-        DiagnosticFrame(
-            "ROI CALCULATOR",
-
-            P("Adjust parameters to see the operational cost savings from ML-powered compliance.",
-              style="color: var(--fg-dim); margin-bottom: 16px;"),
-
-            Form(
-                Div(
-                    Div(
-                        Label("Daily Transaction Volume", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
-                        Input(type="number", name="daily_volume", value="50000", cls="spark-input"),
-                        style="margin-bottom: 12px;",
-                    ),
-                    Div(
-                        Label("Current Manual Review Rate (%)", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
-                        Input(type="number", name="review_rate", value="5", cls="spark-input"),
-                        style="margin-bottom: 12px;",
-                    ),
-                    Div(
-                        Label("Analyst Cost ($/hour)", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
-                        Input(type="number", name="analyst_cost", value="45", cls="spark-input"),
-                        style="margin-bottom: 12px;",
-                    ),
-                    Div(
-                        Label("Minutes per Review", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
-                        Input(type="number", name="review_minutes", value="5", cls="spark-input"),
-                        style="margin-bottom: 12px;",
-                    ),
-                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
-                ),
-                Button("Calculate ROI", cls="spark-btn", type="submit"),
-                **{"hx-post": "/api/v1/models/roi", "hx-target": "#roi-result"},
-            ),
-
-            Div(id="roi-result", style="margin-top: 20px;"),
-
-            status="INTERACTIVE",
-            footer_left="[MOD-002] BUSINESS CASE",
-            footer_right="COST_ANALYSIS",
-        ),
+    card_data = cards.get(name, _FALLBACK_CARDS.get(name, {"name": name, "description": ""}))
+    return DiagnosticFrame(
+        "MODEL CARD",
+        _model_card(name, card_data),
+        status="LOADED" if name in cards else "FALLBACK",
+        footer_left=f"[{name.upper()}] REGISTRY",
+        footer_right="R2_BACKED",
     )
