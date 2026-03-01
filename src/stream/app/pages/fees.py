@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page,
+    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, Tip,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -10,14 +10,27 @@ from stream.app.pages.models_page import render_model_card
 def fees_page():
     return Page("Fee Estimation", "/fees",
         DiagnosticFrame(
+            "FEE ESTIMATION",
+
+            P("Bitcoin transactions compete for limited block space by offering fees. "
+              "This page shows ML-predicted optimal fee rates compared to Bitcoin Core's built-in estimator, "
+              "using live mempool data.",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            status="OVERVIEW",
+            footer_left="BITCOIN FEE PREDICTION",
+            footer_right="LIVE_DATA",
+        ),
+
+        DiagnosticFrame(
             "FEE ESTIMATION ENGINE",
 
             # Live fee recommendations
             DataGrid(
-                DataReadout("NEXT_BLOCK (1)", "--- sat/vB", highlight=True),
-                DataReadout("30_MIN (3)", "--- sat/vB"),
-                DataReadout("1_HOUR (6)", "--- sat/vB"),
-                DataReadout("ECONOMY (12)", "--- sat/vB"),
+                DataReadout(Tip("NEXT_BLOCK (1)", "Target: 1 block (~10 min). Highest fee tier for fastest confirmation."), "--- sat/vB", highlight=True),
+                DataReadout(Tip("30_MIN (3)", "Target: 3 blocks (~30 min). Good balance of speed and cost."), "--- sat/vB"),
+                DataReadout(Tip("1_HOUR (6)", "Target: 6 blocks (~1 hour). Standard priority."), "--- sat/vB"),
+                DataReadout(Tip("ECONOMY (12)", "Target: 12 blocks (~2 hours). Lower priority, cheapest fee."), "--- sat/vB"),
             ),
 
             Div(
@@ -26,8 +39,8 @@ def fees_page():
             ),
 
             status="LIVE",
-            footer_left="[FEE-001] MEMPOOL ANALYSIS",
-            footer_right="SAT/VB",
+            footer_left="LIVE FEE RECOMMENDATIONS",
+            footer_right="MEMPOOL.SPACE",
         ),
 
         # ML vs Bitcoin Core comparison
@@ -45,8 +58,8 @@ def fees_page():
             ),
 
             status="COMPARISON",
-            footer_left="[FEE-002] BENCHMARK",
-            footer_right="ADVANTAGE_ML",
+            footer_left="ML vs CORE BENCHMARK",
+            footer_right="COMPARISON",
         ),
 
         # Mempool state
@@ -60,8 +73,8 @@ def fees_page():
             ),
 
             status="MONITORING",
-            footer_left="[FEE-003] LIVE DATA",
-            footer_right="MEMPOOL.SPACE",
+            footer_left="LIVE MEMPOOL STATE",
+            footer_right="MEMPOOL.SPACE API",
         ),
 
         render_model_card("fee-lgbm"),

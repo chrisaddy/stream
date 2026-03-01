@@ -136,7 +136,8 @@ def WalkthroughSection(title: str, content: str, code: str = None):
     return Div(*children, cls="walkthrough-section")
 
 
-METRIC_TIPS = {
+TIPS = {
+    # --- ML metric terms ---
     "PR-AUC": "Area under the Precision-Recall curve. Measures ranking quality for imbalanced classes — higher means better separation of rare positives.",
     "Precision": "Of all transactions flagged as illicit, what fraction actually were. High precision = fewer false alarms.",
     "Recall": "Of all truly illicit transactions, what fraction were caught. High recall = fewer missed threats.",
@@ -153,12 +154,39 @@ METRIC_TIPS = {
     "Samples": "Number of data points used for evaluation.",
     "Threshold": "Classification cutoff — predictions above this score are flagged. Tuned for business cost.",
     "Total Cost": "Estimated business cost combining false negatives (missed illicit) and false positives (unnecessary reviews).",
+    # --- Bitcoin terms ---
+    "mempool": "Bitcoin's waiting room — unconfirmed transactions sit here until a miner includes them in a block.",
+    "sat/vB": "Satoshis per virtual byte — the unit for Bitcoin transaction fees. Higher = faster confirmation.",
+    "vsize": "Virtual size of a transaction in bytes. Determines how much block space it uses.",
+    "BTC": "Bitcoin — the base currency unit. 1 BTC = 100,000,000 satoshis.",
+    "sats": "Satoshis — the smallest unit of Bitcoin. 1 sat = 0.00000001 BTC.",
+    "Lightning Network": "A layer-2 payment network built on Bitcoin. Enables instant, low-fee transactions through payment channels.",
+    "channels": "Payment channels between Lightning nodes. Funds are locked in a channel to enable off-chain transactions.",
+    "nodes": "Computers running Lightning Network software. They route payments and maintain channels.",
+    "capacity": "Total Bitcoin locked in a Lightning channel or across the network, available for routing payments.",
+    "routing": "Forwarding payments through intermediate nodes in the Lightning Network to reach the destination.",
+    "public key": "A cryptographic identifier for a Lightning node. Like an address that other nodes use to find and connect to it.",
+    # --- ML model terms ---
+    "XGBoost": "Extreme Gradient Boosting — a fast, accurate ML algorithm for structured data. Industry standard for tabular prediction tasks.",
+    "GCN": "Graph Convolutional Network — a neural network that operates on graph-structured data, capturing relationships between connected transactions.",
+    "LightGBM": "Light Gradient Boosting Machine — similar to XGBoost but optimized for speed and memory efficiency.",
+    "Logistic Regression": "A simple, interpretable ML model that estimates probabilities. Often used as a baseline to compare against more complex models.",
+    "Calibrated": "A model whose predicted probabilities match real-world frequencies. If it says 80% risk, ~80% of those cases are actually risky.",
+    # --- ML concept terms ---
+    "SHAP": "SHapley Additive exPlanations — a method that shows how much each input feature contributed to a prediction. Makes ML decisions interpretable.",
+    "KYC": "Know Your Customer — regulatory requirement for financial institutions to verify the identity of their clients.",
+    "LLM": "Large Language Model — AI that generates human-readable text. Used here to convert technical SHAP values into compliance narratives.",
+    "Platt Scaling": "A technique to calibrate model probabilities by fitting a logistic regression on top of raw model scores.",
+    "Feature Importance": "Ranking of which input variables matter most for the model's predictions.",
 }
+
+# Backwards compat alias
+METRIC_TIPS = TIPS
 
 
 def Tip(text: str, tip: str = ""):
     """Wrap text in a tooltip span. Falls back to plain text if no tip provided."""
-    desc = tip or METRIC_TIPS.get(text, "")
+    desc = tip or TIPS.get(text, "")
     if not desc:
         return text
     return Span(text, cls="tip", **{"data-tip": desc})

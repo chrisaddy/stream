@@ -65,10 +65,10 @@ def register_api_routes(rt):
             pass
 
         return DataGrid(
-            DataReadout("MEMPOOL_SIZE", mempool_size, highlight=True),
-            DataReadout("TRANSACTIONS_SCORED", f"{tx_scored:04d}"),
-            DataReadout("AVG_RISK_SCORE", f"{avg_risk:.2f}"),
-            DataReadout("RECOMMENDED_FEE", recommended_fee),
+            DataReadout(Tip("MEMPOOL_SIZE", "Number of unconfirmed transactions waiting in Bitcoin's mempool."), mempool_size, highlight=True),
+            DataReadout(Tip("TRANSACTIONS_SCORED", "Total transactions scored by the ML model this session."), f"{tx_scored:04d}"),
+            DataReadout(Tip("AVG_RISK_SCORE", "Average illicit-activity risk score across all scored transactions."), f"{avg_risk:.2f}"),
+            DataReadout(Tip("RECOMMENDED_FEE", "Suggested fee rate for next-block confirmation."), recommended_fee),
         )
 
     @rt("/api/v1/home/prediction-count")
@@ -128,7 +128,7 @@ def register_api_routes(rt):
         """Return model metrics for display."""
         return Div(
             Table(
-                Thead(Tr(Th("Metric"), Th("XGBoost"), Th("GCN"), Th("Winner"))),
+                Thead(Tr(Th("Metric"), Th(Tip("XGBoost")), Th(Tip("GCN")), Th("Winner"))),
                 Tbody(
                     Tr(Td(Tip("PR-AUC")), Td("0.8234", style="color: var(--fg-green);"), Td("0.7891"), Td("XGBoost")),
                     Tr(Td(Tip("Precision")), Td("0.891"), Td("0.856"), Td("XGBoost")),
@@ -174,10 +174,10 @@ def register_api_routes(rt):
                 fees = resp.json()
 
             return DataGrid(
-                DataReadout("NEXT_BLOCK (1)", f"{fees.get('fastestFee', '?')} sat/vB", highlight=True),
-                DataReadout("30_MIN (3)", f"{fees.get('halfHourFee', '?')} sat/vB"),
-                DataReadout("1_HOUR (6)", f"{fees.get('hourFee', '?')} sat/vB"),
-                DataReadout("ECONOMY (12)", f"{fees.get('economyFee', '?')} sat/vB"),
+                DataReadout(Tip("NEXT_BLOCK (1)", "Target: 1 block (~10 min). Highest fee tier for fastest confirmation."), f"{fees.get('fastestFee', '?')} sat/vB", highlight=True),
+                DataReadout(Tip("30_MIN (3)", "Target: 3 blocks (~30 min). Good balance of speed and cost."), f"{fees.get('halfHourFee', '?')} sat/vB"),
+                DataReadout(Tip("1_HOUR (6)", "Target: 6 blocks (~1 hour). Standard priority."), f"{fees.get('hourFee', '?')} sat/vB"),
+                DataReadout(Tip("ECONOMY (12)", "Target: 12 blocks (~2 hours). Lower priority, cheapest fee."), f"{fees.get('economyFee', '?')} sat/vB"),
             )
         except Exception as e:
             return P(f"Failed to fetch fees: {e}", style="color: var(--fg-red);")
@@ -218,9 +218,9 @@ def register_api_routes(rt):
                 mempool = resp.json()
 
             return DataGrid(
-                DataReadout("TX_COUNT", f"{mempool.get('count', 0):,}"),
-                DataReadout("MEMPOOL_SIZE", f"{mempool.get('vsize', 0) / 1_000_000:.1f} MvB"),
-                DataReadout("TOTAL_FEES", f"{mempool.get('total_fee', 0) / 100_000_000:.4f} BTC"),
+                DataReadout(Tip("TX_COUNT", "Number of unconfirmed transactions currently in the mempool."), f"{mempool.get('count', 0):,}"),
+                DataReadout(Tip("MEMPOOL_SIZE", "Total virtual size of all unconfirmed transactions, in mega virtual bytes."), f"{mempool.get('vsize', 0) / 1_000_000:.1f} MvB"),
+                DataReadout(Tip("TOTAL_FEES", "Sum of all fees from unconfirmed transactions waiting in the mempool."), f"{mempool.get('total_fee', 0) / 100_000_000:.4f} BTC"),
             )
         except Exception as e:
             return P(f"Error: {e}", style="color: var(--fg-red);")
@@ -281,9 +281,9 @@ def register_api_routes(rt):
             cap_btc = capacity / 100_000_000 if isinstance(capacity, (int, float)) else 0
 
             return DataGrid(
-                DataReadout("TOTAL_NODES", f"{node_count:,}" if isinstance(node_count, int) else str(node_count), highlight=True),
-                DataReadout("TOTAL_CHANNELS", f"{channel_count:,}" if isinstance(channel_count, int) else str(channel_count)),
-                DataReadout("NETWORK_CAPACITY", f"{cap_btc:,.0f} BTC"),
+                DataReadout(Tip("TOTAL_NODES", "Computers running Lightning Network software. They route payments and maintain channels."), f"{node_count:,}" if isinstance(node_count, int) else str(node_count), highlight=True),
+                DataReadout(Tip("TOTAL_CHANNELS", "Payment channels between Lightning nodes. Funds are locked in a channel to enable off-chain transactions."), f"{channel_count:,}" if isinstance(channel_count, int) else str(channel_count)),
+                DataReadout(Tip("NETWORK_CAPACITY", "Total Bitcoin locked across all Lightning channels, available for routing payments."), f"{cap_btc:,.0f} BTC"),
             )
         except Exception as e:
             return P(f"Error: {e}", style="color: var(--fg-red);")
@@ -479,7 +479,7 @@ def register_api_routes(rt):
             if lr and xgb:
                 return Div(
                     Table(
-                        Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
+                        Thead(Tr(Th("Metric"), Th(Tip("Logistic Regression")), Th(Tip("Calibrated", "A model whose predicted probabilities match real-world frequencies. If it says 80% risk, ~80% of those cases are actually risky."), " ", Tip("XGBoost")))),
                         Tbody(
                             Tr(Td(Tip("Accuracy")), Td(f"{lr.get('accuracy', 0):.4f}"), Td(f"{xgb.get('accuracy', 0):.4f}", style="color: var(--fg-green);")),
                             Tr(Td(Tip("F1 (macro)")), Td(f"{lr.get('f1_macro', 0):.4f}"), Td(f"{xgb.get('f1_macro', 0):.4f}", style="color: var(--fg-green);")),
@@ -494,7 +494,7 @@ def register_api_routes(rt):
         # Hardcoded fallback
         return Div(
             Table(
-                Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
+                Thead(Tr(Th("Metric"), Th(Tip("Logistic Regression")), Th(Tip("Calibrated", "A model whose predicted probabilities match real-world frequencies. If it says 80% risk, ~80% of those cases are actually risky."), " ", Tip("XGBoost")))),
                 Tbody(
                     Tr(Td(Tip("Accuracy")), Td("—"), Td("—")),
                     Tr(Td(Tip("F1 (macro)")), Td("—"), Td("—")),

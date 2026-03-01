@@ -39,8 +39,8 @@ def home_page():
             ),
 
             status="LIVE",
-            footer_left="[STR-001] REAL-TIME SCORING",
-            footer_right="MEMPOOL_ACTIVE",
+            footer_left="REAL-TIME SCORING",
+            footer_right="MEMPOOL ACTIVE",
         ),
 
         # Live scoring feed
@@ -72,8 +72,8 @@ def home_page():
             ),
 
             status="STREAMING",
-            footer_left="[STR-002] AUDIT TRAIL",
-            footer_right="SSE_CONNECTED",
+            footer_left="AUDIT TRAIL",
+            footer_right="SSE CONNECTED",
         ),
 
         # Oscilloscope JS

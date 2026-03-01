@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, Page,
+    Card, DataGrid, DataReadout, DiagnosticFrame, Page, Tip,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -10,13 +10,26 @@ from stream.app.pages.models_page import render_model_card
 def lightning_page():
     return Page("Lightning Network", "/lightning",
         DiagnosticFrame(
+            "LIGHTNING NETWORK",
+
+            P("The Lightning Network is Bitcoin's layer-2 scaling solution. "
+              "This page analyzes network topology — node connectivity, channel capacity, "
+              "and routing potential — using live data from mempool.space.",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            status="OVERVIEW",
+            footer_left="LAYER-2 ANALYSIS",
+            footer_right="LIVE_DATA",
+        ),
+
+        DiagnosticFrame(
             "LIGHTNING NETWORK ANALYSIS",
 
             DataGrid(
-                DataReadout("TOTAL_NODES", "---", highlight=True),
-                DataReadout("TOTAL_CHANNELS", "---"),
-                DataReadout("NETWORK_CAPACITY", "--- BTC"),
-                DataReadout("AVG_CHANNEL_SIZE", "--- sats"),
+                DataReadout(Tip("TOTAL_NODES", "Computers running Lightning Network software. They route payments and maintain channels."), "---", highlight=True),
+                DataReadout(Tip("TOTAL_CHANNELS", "Payment channels between Lightning nodes. Funds are locked in a channel to enable off-chain transactions."), "---"),
+                DataReadout(Tip("NETWORK_CAPACITY", "Total Bitcoin locked across all Lightning channels, available for routing payments."), "--- BTC"),
+                DataReadout(Tip("AVG_CHANNEL_SIZE", "Average amount of Bitcoin locked per channel."), "--- sats"),
             ),
 
             Div(
@@ -25,8 +38,8 @@ def lightning_page():
             ),
 
             status="LIVE",
-            footer_left="[LN-001] TOPOLOGY",
-            footer_right="MEMPOOL.SPACE",
+            footer_left="NETWORK TOPOLOGY",
+            footer_right="MEMPOOL.SPACE API",
         ),
 
         # Top routing nodes
@@ -35,7 +48,10 @@ def lightning_page():
 
             Table(
                 Thead(Tr(
-                    Th("Rank"), Th("Alias"), Th("Channels"), Th("Capacity (BTC)"), Th("Routing Score"),
+                    Th("Rank"), Th("Alias"),
+                    Th(Tip("Channels", "Payment channels between Lightning nodes. Funds are locked in a channel to enable off-chain transactions.")),
+                    Th(Tip("Capacity (BTC)", "Total Bitcoin locked in this node's channels, available for routing payments.")),
+                    Th(Tip("Routing Score", "ML-predicted score for how effective this node is at routing payments through the network.")),
                 )),
                 Tbody(
                     id="top-nodes",
@@ -45,15 +61,19 @@ def lightning_page():
             ),
 
             status="RANKED",
-            footer_left="[LN-002] CENTRALITY",
-            footer_right="BY_CONNECTIVITY",
+            footer_left="NODE CENTRALITY RANKING",
+            footer_right="BY CONNECTIVITY",
         ),
 
         # Node evaluator
         DiagnosticFrame(
             "NODE EVALUATOR",
 
-            P("Enter a Lightning node public key to evaluate its routing potential.",
+            P("Enter a Lightning node ",
+              Tip("public key"),
+              " to evaluate its ",
+              Tip("routing"),
+              " potential.",
               style="color: var(--fg-subtle); margin-bottom: 12px;"),
 
             Form(
@@ -68,8 +88,8 @@ def lightning_page():
             Div(id="node-result", style="margin-top: 16px;"),
 
             status="INTERACTIVE",
-            footer_left="[LN-003] SCORING",
-            footer_right="ENTER_PUBKEY",
+            footer_left="ROUTING POTENTIAL SCORER",
+            footer_right="ENTER PUBLIC KEY",
         ),
 
         render_model_card("lightning-lgbm"),

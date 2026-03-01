@@ -2,12 +2,25 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    DataGrid, DataReadout, DiagnosticFrame, Page, StatusBadge,
+    DataGrid, DataReadout, DiagnosticFrame, Page, StatusBadge, Tip,
 )
 
 
 def alerts_page():
     return Page("Alert Queue", "/alerts",
+        DiagnosticFrame(
+            "ALERT QUEUE",
+
+            P("Transactions scored above the risk threshold are automatically queued here for compliance review. "
+              "Each alert includes a SHAP explanation (why the model flagged it) and an AI-generated narrative "
+              "for the compliance report.",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            status="OVERVIEW",
+            footer_left="COMPLIANCE PIPELINE",
+            footer_right="SHAP + LLM",
+        ),
+
         DiagnosticFrame(
             "COMPLIANCE ALERT QUEUE",
 
@@ -29,8 +42,8 @@ def alerts_page():
             ),
 
             status="MONITORING",
-            footer_left="[ALT-001] SAR PIPELINE",
-            footer_right="LLM_NARRATIVES",
+            footer_left="SUSPICIOUS ACTIVITY REPORTS",
+            footer_right="LLM NARRATIVES",
         ),
 
         # Alert detail / narrative
@@ -38,13 +51,16 @@ def alerts_page():
             "ALERT DETAIL",
 
             Div(
-                P("Select an alert from the queue to view SHAP explanation and AI-generated compliance narrative.",
+                P("Select an alert from the queue to view ",
+                  Tip("SHAP"), " explanation and ",
+                  Tip("LLM", "Large Language Model — AI that generates human-readable text. Used here to convert technical SHAP values into compliance narratives."),
+                  "-generated compliance narrative.",
                   style="color: var(--fg-subtle);"),
                 id="alert-detail",
             ),
 
             status="SELECT_ALERT",
-            footer_left="[ALT-002] SHAP + LLM",
-            footer_right="AUDIT_TRAIL",
+            footer_left="SHAP + LLM EXPLANATION",
+            footer_right="AUDIT TRAIL",
         ),
     )

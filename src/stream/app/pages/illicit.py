@@ -10,6 +10,19 @@ from stream.app.pages.models_page import render_model_card
 def illicit_page():
     return Page("Illicit Detection", "/illicit",
         DiagnosticFrame(
+            "ILLICIT DETECTION",
+
+            P("Regulated Bitcoin exchanges must screen every transaction for potential illicit activity "
+              "(money laundering, sanctions evasion). This page compares two ML approaches: "
+              "XGBoost (fast, explainable) vs GCN (graph-aware, catches network patterns).",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            status="OVERVIEW",
+            footer_left="TRANSACTION SCREENING",
+            footer_right="ML_COMPARISON",
+        ),
+
+        DiagnosticFrame(
             "ILLICIT TRANSACTION DETECTION",
 
             # Model comparison
@@ -18,7 +31,7 @@ def illicit_page():
             Div(
                 Table(
                     Thead(Tr(
-                        Th("Metric"), Th("XGBoost"), Th("GCN"), Th("Winner"),
+                        Th("Metric"), Th(Tip("XGBoost")), Th(Tip("GCN")), Th("Winner"),
                     )),
                     Tbody(
                         Tr(Td(Tip("PR-AUC")), Td(id="xgb-prauc"), Td(id="gcn-prauc"), Td(id="prauc-winner")),
@@ -36,15 +49,16 @@ def illicit_page():
             ),
 
             status="MODEL_LOADED",
-            footer_left="[ILL-001] BINARY CLASSIFICATION",
-            footer_right="ELLIPTIC_DATASET",
+            footer_left="ILLICIT DETECTION",
+            footer_right="ELLIPTIC BITCOIN DATASET",
         ),
 
         # Interactive scoring
         DiagnosticFrame(
             "INTERACTIVE SCORING",
 
-            P("Submit transaction features for real-time risk scoring with SHAP explanation.",
+            P("Submit transaction features for real-time risk scoring with ",
+              Tip("SHAP"), " explanation.",
               style="color: var(--fg-subtle); margin-bottom: 16px;"),
 
             Form(
@@ -72,8 +86,8 @@ def illicit_page():
             Div(id="score-result", style="margin-top: 20px;"),
 
             status="READY",
-            footer_left="[ILL-002] SINGLE PREDICTION",
-            footer_right="SHAP_ENABLED",
+            footer_left="SINGLE TRANSACTION SCORER",
+            footer_right="SHAP EXPLANATIONS",
         ),
 
         # Threshold slider
@@ -107,8 +121,8 @@ def illicit_page():
             """),
 
             status="INTERACTIVE",
-            footer_left="[ILL-003] COST-SENSITIVE",
-            footer_right="FN >> FP",
+            footer_left="COST-SENSITIVE THRESHOLD",
+            footer_right="MISSED THREATS COST MORE",
         ),
 
         render_model_card("illicit-xgboost"),

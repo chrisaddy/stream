@@ -10,6 +10,19 @@ from stream.app.pages.models_page import render_model_card
 def onboarding_page():
     return Page("Onboarding Risk", "/onboarding",
         DiagnosticFrame(
+            "ONBOARDING RISK",
+
+            P("When new customers sign up at a regulated exchange, they go through KYC (Know Your Customer) verification. "
+              "This model scores onboarding risk based on signals like email type, document verification, "
+              "and initial behavior patterns.",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
+            status="OVERVIEW",
+            footer_left="KYC RISK SCORING",
+            footer_right="SYNTHETIC_DATA",
+        ),
+
+        DiagnosticFrame(
             "ONBOARDING RISK SCORING",
 
             P("Interactive demo: fill out a mock signup form and get a risk score with explanation.",
@@ -73,8 +86,8 @@ def onboarding_page():
             Div(id="onboarding-result", style="margin-top: 20px;"),
 
             status="DEMO",
-            footer_left="[ONB-001] KYC TRIAGE",
-            footer_right="SYNTHETIC_DATA",
+            footer_left="KYC RISK TRIAGE",
+            footer_right="SYNTHETIC DATA",
         ),
 
         # Model comparison
@@ -87,8 +100,8 @@ def onboarding_page():
             ),
 
             status="LR vs XGB",
-            footer_left="[ONB-002] CALIBRATION",
-            footer_right="PLATT_SCALING",
+            footer_left="MODEL CALIBRATION",
+            footer_right="PLATT SCALING",
         ),
 
         render_model_card("onboarding-xgb"),
