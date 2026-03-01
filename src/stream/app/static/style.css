@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 /* Main layout */
 .app-layout {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 240px 1fr;
     min-height: 100vh;
 }
 
@@ -52,12 +52,13 @@ a:hover { text-decoration: underline; }
     top: 0;
     height: 100vh;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .nav-brand {
-    padding: 0 16px 20px;
+    padding: 0 12px 16px;
     border-bottom: 1px solid var(--fg-dim);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .nav-brand h1 {
@@ -77,8 +78,8 @@ a:hover { text-decoration: underline; }
 }
 
 .nav-section {
-    padding: 0 16px;
-    margin-bottom: 16px;
+    padding: 0 12px;
+    margin-bottom: 12px;
 }
 
 .nav-section-title {
@@ -93,11 +94,14 @@ a:hover { text-decoration: underline; }
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 6px 10px;
     color: var(--fg-white);
-    font-size: 12px;
+    font-size: 11px;
     border-left: 2px solid transparent;
     transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .nav-link:hover {
@@ -113,9 +117,10 @@ a:hover { text-decoration: underline; }
 }
 
 .nav-link .dot {
-    width: 6px; height: 6px;
+    width: 5px; height: 5px;
     border-radius: 50%;
     background: var(--fg-dim);
+    flex-shrink: 0;
 }
 
 .nav-link.active .dot { background: var(--fg-green); }

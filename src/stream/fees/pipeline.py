@@ -236,17 +236,27 @@ def create_artifacts(metrics, card):
 
 
 @flow(name="fee-estimation-training")
-async def train_fees_pipeline():
-    cached = load_cached_snapshots()
-    new_snapshots = await collect_data()
+async def train_fees_pipeline(collect_new: bool = True):
+    """Train fee model on accumulated snapshots.
 
-    snapshots = cached + new_snapshots
+    If collect_new=True (default), also collects a fresh batch.
+    The hourly data pipeline handles ongoing collection, so training
+    runs can set collect_new=False to just train on existing data.
+    """
+    cached = load_cached_snapshots()
+
+    if collect_new:
+        new_snapshots = await collect_data()
+        snapshots = cached + new_snapshots
+        save_snapshots(snapshots)
+    else:
+        snapshots = cached
+
     if not snapshots:
-        log.error("No snapshots collected")
+        log.error("No snapshots available — run data collection first")
         return
 
-    save_snapshots(snapshots)
-
+    log.info("Training on snapshots", count=len(snapshots))
     X, y = featurize(snapshots)
     model, feature_cols, X_features, y_target = train_model(X, y)
     metrics = evaluate_model(model, X_features, y_target, feature_cols)

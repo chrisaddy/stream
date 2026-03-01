@@ -26,7 +26,11 @@ format:
     uv run ruff format src/ tests/
     uv run ruff check --fix src/ tests/
 
-# Deploy all training flows to Prefect Cloud (every 2h)
+# Run hourly data collection once (fee snapshots + lightning topology)
+collect-data:
+    uv run python -m stream.data.pipeline
+
+# Deploy all flows to Prefect Cloud (collection hourly, training every 6h)
 deploy-flows:
     uv run python scripts/deploy_flows.py
 
