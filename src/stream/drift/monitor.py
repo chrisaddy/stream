@@ -1,10 +1,12 @@
-"""Drift monitor — tracks prediction distribution shift via PSI.
+"""Drift monitor — tracks prediction distribution shift via PSI + ADWIN.
 
 Uses an in-memory ring buffer of recent scores and compares against
 a baseline distribution to detect when the model's scoring behavior
-has shifted significantly.
+has shifted significantly. ADWIN provides adaptive windowing for
+change-point detection.
 """
 
+import time as _time
 from collections import deque
 
 import numpy as np
@@ -23,6 +25,36 @@ _BASELINE_SIZE = 200  # Collect this many before computing baseline
 # PSI bin edges (10 equal-width bins from 0 to 1)
 _BIN_EDGES = np.linspace(0.0, 1.0, 11)
 
+# ADWIN state
+_adwin = None
+_adwin_drift_detected = False
+_adwin_n_samples = 0
+_adwin_last_drift_at: float | None = None
+_adwin_drift_history: list[dict] = []
+
+
+def _adwin_update(score: float):
+    """Update ADWIN with a new score, detect drift."""
+    global _adwin, _adwin_drift_detected, _adwin_n_samples, _adwin_last_drift_at
+
+    if _adwin is None:
+        from river.drift import ADWIN
+        _adwin = ADWIN(delta=0.002)
+
+    _adwin.update(score)
+    _adwin_n_samples += 1
+
+    if _adwin.drift_detected:
+        _adwin_drift_detected = True
+        _adwin_last_drift_at = _time.time()
+        _adwin_drift_history.append({
+            "sample": _adwin_n_samples,
+            "timestamp": _adwin_last_drift_at,
+        })
+        log.warning("ADWIN drift detected", sample=_adwin_n_samples)
+    else:
+        _adwin_drift_detected = False
+
 
 def record_score(score: float):
     """Record a new prediction score into the drift buffer."""
@@ -33,6 +65,12 @@ def record_score(score: float):
         _baseline_count += 1
         if _baseline_count >= _BASELINE_SIZE:
             _compute_baseline()
+
+    # Also feed ADWIN
+    try:
+        _adwin_update(score)
+    except Exception:
+        pass
 
 
 def _compute_baseline():
@@ -77,8 +115,41 @@ def compute_psi() -> float | None:
     return psi
 
 
+def get_adwin_status() -> dict:
+    """Return ADWIN detector status."""
+    estimation = None
+    width = None
+    if _adwin is not None:
+        try:
+            estimation = float(_adwin.estimation)
+            width = int(_adwin.width)
+        except Exception:
+            pass
+
+    return {
+        "enabled": True,
+        "drift_detected": _adwin_drift_detected,
+        "n_samples": _adwin_n_samples,
+        "last_drift_at": _adwin_last_drift_at,
+        "drift_count": len(_adwin_drift_history),
+        "estimation": estimation,
+        "width": width,
+    }
+
+
+def reset_adwin():
+    """Re-initialize ADWIN (called after adaptation)."""
+    global _adwin, _adwin_drift_detected, _adwin_n_samples, _adwin_last_drift_at
+    from river.drift import ADWIN
+    _adwin = ADWIN(delta=0.002)
+    _adwin_drift_detected = False
+    _adwin_n_samples = 0
+    _adwin_last_drift_at = None
+    log.info("ADWIN reset")
+
+
 def get_status() -> dict:
-    """Get current drift status with PSI and distribution stats."""
+    """Get current drift status with PSI, ADWIN, and distribution stats."""
     psi = compute_psi()
     n_scores = len(_score_buffer)
     has_baseline = _baseline_hist is not None
@@ -120,6 +191,7 @@ def get_status() -> dict:
         "has_baseline": has_baseline,
         "remaining": remaining,
         "stats": stats,
+        "adwin": get_adwin_status(),
     }
 
 

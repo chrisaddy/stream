@@ -121,6 +121,7 @@ def FeedHeader():
         Div("FEE_RATE"),
         Div("RISK"),
         Div("LABEL"),
+        Div("ANOMALY"),
         cls="feed-row",
         style="color: var(--fg-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid var(--fg-dim);",
     )

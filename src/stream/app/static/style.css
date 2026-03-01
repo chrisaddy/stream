@@ -306,7 +306,7 @@ a:hover { text-decoration: underline; }
 /* Feed row */
 .feed-row {
     display: grid;
-    grid-template-columns: 100px 140px 80px 80px 80px 1fr;
+    grid-template-columns: 100px 140px 80px 80px 80px 60px 70px;
     padding: 8px 10px;
     border-bottom: 1px solid rgba(224, 222, 244, 0.03);
     font-size: 11px;
@@ -614,6 +614,21 @@ input[type="range"]::-moz-range-thumb {
     letter-spacing: 1px;
     padding: 0 6px;
     font-family: var(--font-mono);
+}
+
+/* Anomaly score colors */
+.anomaly-low { color: var(--fg-green); }
+.anomaly-med { color: var(--fg-iris); }
+.anomaly-high { color: var(--fg-red); text-shadow: 0 0 6px rgba(235, 111, 146, 0.4); }
+
+/* Adapting glow animation */
+.adapting-glow {
+    animation: adapting-glow 1.5s ease-in-out infinite;
+}
+@keyframes adapting-glow {
+    0% { text-shadow: 0 0 4px rgba(246, 193, 119, 0.3); }
+    50% { text-shadow: 0 0 12px rgba(246, 193, 119, 0.8); }
+    100% { text-shadow: 0 0 4px rgba(246, 193, 119, 0.3); }
 }
 
 /* Responsive */

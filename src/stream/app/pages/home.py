@@ -141,7 +141,7 @@ def home_page():
             cls="triple-row",
         ),
 
-        # Feedback loop + Drift monitor — side by side
+        # Feedback loop + Drift monitor + Online metrics — 3 columns
         Div(
             DiagnosticFrame(
                 "FEEDBACK LOOP",
@@ -171,11 +171,76 @@ def home_page():
                 ),
 
                 status="WATCHING",
-                footer_left="PSI MONITOR",
+                footer_left="PSI + ADWIN / SELF_HEALING",
                 footer_right="DISTRIBUTION_SHIFT",
             ),
 
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
+            DiagnosticFrame(
+                "ONLINE METRICS",
+
+                P("Live precision, recall, F1, ROCAUC — cumulative and rolling window.",
+                  style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+                Div(
+                    id="online-metrics-panel",
+                    **{"hx-get": "/api/v1/online/metrics", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                ),
+
+                status="TRACKING",
+                footer_left="RIVER ONLINE ML",
+                footer_right="CUMULATIVE + ROLLING",
+            ),
+
+            style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;",
+        ),
+
+        # Anomaly detector panel
+        DiagnosticFrame(
+            "ANOMALY DETECTOR",
+
+            P("Unsupervised anomaly detection using Half-Space Trees. Learns transaction patterns and flags outliers.",
+              style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+            Div(
+                id="anomaly-panel",
+                **{"hx-get": "/api/v1/anomaly/status", "hx-trigger": "load, every 15s", "hx-swap": "innerHTML"},
+            ),
+
+            status="SCANNING",
+            footer_left="HALF-SPACE TREES",
+            footer_right="UNSUPERVISED",
+        ),
+
+        # Model Race — full width
+        DiagnosticFrame(
+            "MODEL RACE",
+
+            P("3 River classifiers competing in real-time: LogisticRegression vs HoeffdingTree vs GaussianNB.",
+              style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
+
+            Div(
+                Div(
+                    H4("STANDINGS", style="color: var(--fg-dim); font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                    Div(
+                        id="race-standings",
+                        **{"hx-get": "/api/v1/online/race/standings", "hx-trigger": "load, every 5s", "hx-swap": "innerHTML"},
+                    ),
+                    style="flex: 1;",
+                ),
+                Div(
+                    H4("CONVERGENCE", style="color: var(--fg-dim); font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                    Div(
+                        id="race-convergence",
+                        **{"hx-get": "/api/v1/online/race/convergence", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"},
+                    ),
+                    style="flex: 2;",
+                ),
+                style="display: flex; gap: 24px;",
+            ),
+
+            status="RACING",
+            footer_left="RIVER ONLINE ML",
+            footer_right="ADAPTIVE_ENSEMBLE",
         ),
 
         # Oscilloscope JS — reacts to incoming SSE scores
@@ -185,6 +250,7 @@ def home_page():
             const ctx = canvas.getContext('2d');
             let width, height, time = 0;
             const scoreHistory = [];
+            const anomalyHistory = [];
             const MAX_POINTS = 200;
 
             function resize() {
@@ -207,6 +273,14 @@ def home_page():
                         if (!isNaN(score)) {
                             scoreHistory.push(score);
                             if (scoreHistory.length > MAX_POINTS) scoreHistory.shift();
+                        }
+                    }
+                    const anomalyEl = el.querySelector('.anomaly-low, .anomaly-med, .anomaly-high');
+                    if (anomalyEl) {
+                        const aScore = parseFloat(anomalyEl.textContent);
+                        if (!isNaN(aScore)) {
+                            anomalyHistory.push(aScore);
+                            if (anomalyHistory.length > MAX_POINTS) anomalyHistory.shift();
                         }
                     }
                 } catch(err) {}
@@ -258,6 +332,21 @@ def home_page():
                             ctx.fill();
                         }
                     });
+                    // Anomaly trace — purple dashed line
+                    if (anomalyHistory.length > 1) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(196, 167, 231, 0.6)';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([6, 4]);
+                        const aStartX = width - anomalyHistory.length * step;
+                        anomalyHistory.forEach((a, i) => {
+                            const x = aStartX + i * step;
+                            const y = height - (a * height * 0.9) - height * 0.05;
+                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        });
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
                 } else {
                     // Waiting for data — show flat baseline with pulse
                     ctx.beginPath();

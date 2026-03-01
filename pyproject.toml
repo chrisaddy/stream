@@ -25,6 +25,8 @@ dependencies = [
     "plotly>=6.0.0",
     # Logging
     "structlog>=24.4.0",
+    # Online ML
+    "river>=0.21.0",
 ]
 
 [build-system]

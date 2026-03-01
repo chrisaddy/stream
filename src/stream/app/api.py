@@ -837,6 +837,7 @@ def register_api_routes(rt):
         verdict = form.get("verdict", "true_positive")
 
         alert = None
+        raw_input = {}
         try:
             db = SessionLocal()
             try:
@@ -851,6 +852,7 @@ def register_api_routes(rt):
                     model_name = alert.model_name or "live-heuristic"
                     shap_data = alert.explanation or []
                     narrative_text = alert.narrative or ""
+                    raw_input = alert.raw_input or {}
             finally:
                 db.close()
         except Exception as e:
@@ -867,6 +869,43 @@ def register_api_routes(rt):
                 "risk_score_at_review": risk_score,
                 "threshold_at_review": get_risk_threshold(),
             })
+
+            # === River Online Learning Integration ===
+            label = 1 if verdict == "true_positive" else 0
+            fee_rate = raw_input.get("fee_rate", 0)
+            vsize = raw_input.get("vsize", 0)
+            fee = raw_input.get("fee", 0)
+
+            # 1. River learn_one (Feature 1)
+            try:
+                from stream.feedback.pipeline import river_learn_one
+                river_learn_one(fee_rate, vsize, fee, label)
+            except Exception as e:
+                log.debug("River learn_one failed", error=str(e))
+
+            # 2. Online metrics (Feature 4)
+            try:
+                from stream.online.metrics import record_label
+                record_label(y_true=label, y_pred_score=risk_score, threshold=get_risk_threshold())
+            except Exception as e:
+                log.debug("Online metrics update failed", error=str(e))
+
+            # 3. Model race (Feature 5)
+            try:
+                from stream.online.race import get_race
+                race = get_race()
+                features = {"fee_rate": fee_rate, "vsize": vsize, "fee": fee}
+                race.learn_one(features, bool(label))
+            except Exception as e:
+                log.debug("Model race update failed", error=str(e))
+
+            # 4. Adaptation loop (Feature 6)
+            try:
+                from stream.online.adaptation import record_prediction_error, check_stabilization
+                record_prediction_error(abs(label - risk_score))
+                check_stabilization()
+            except Exception as e:
+                log.debug("Adaptation update failed", error=str(e))
 
         verdict_label = "TRUE POSITIVE" if verdict == "true_positive" else "FALSE POSITIVE"
         verdict_color = "var(--fg-red)" if verdict == "true_positive" else "var(--fg-green)"
@@ -1169,14 +1208,18 @@ def register_api_routes(rt):
         except Exception:
             total, tp, fp = 0, 0, 0
 
-        from stream.feedback.pipeline import get_retrain_status, get_model_metadata
+        from stream.feedback.pipeline import get_retrain_status, get_model_metadata, get_river_metrics
         status = get_retrain_status()
         meta = get_model_metadata()
+        river = get_river_metrics()
 
         # Model lineage strip
         lineage = "heuristic-v1.0"
         if meta:
-            lineage += f" → live-heuristic-v2.0 ({meta['n_labels']} labels)"
+            lineage += f" → lgbm-v2.0 ({meta['n_labels']} labels)"
+        if river["n_samples"] > 0:
+            river_status = "ACTIVE" if river["is_ready"] else "WARMING"
+            lineage += f" → river-v3.0 [{river_status}]"
 
         status_color = {"IDLE": "var(--fg-dim)", "TRAINING": "var(--fg-orange)", "COMPLETE": "var(--fg-green)", "ERROR": "var(--fg-red)"}.get(status["state"], "var(--fg-dim)")
 
@@ -1299,6 +1342,67 @@ def register_api_routes(rt):
                 ),
             )
 
+        # ADWIN status
+        adwin = d.get("adwin", {})
+        if adwin.get("enabled"):
+            adwin_color = "var(--fg-red)" if adwin.get("drift_detected") else "var(--fg-green)"
+            adwin_label = "DRIFT" if adwin.get("drift_detected") else "STABLE"
+            parts.append(
+                Div(
+                    H4("ADWIN DETECTOR", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                    Div(
+                        Span("STATUS: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                        Span(adwin_label, style=f"color: {adwin_color}; font-weight: bold; font-size: 12px;"),
+                        Span(f"  WINDOW: {adwin.get('width', '—')}  DRIFTS: {adwin.get('drift_count', 0)}",
+                             style="color: var(--fg-subtle); margin-left: 12px; font-size: 11px;"),
+                    ),
+                ),
+            )
+            if adwin.get("drift_detected"):
+                parts.append(
+                    P(f"ADWIN CHANGE POINT at sample {adwin.get('n_samples', '?')}",
+                      style="color: var(--fg-red); font-weight: bold; font-size: 11px; text-align: center; padding: 6px; border: 1px solid var(--fg-red); margin-top: 8px;"),
+                )
+
+        # Adaptation status
+        try:
+            from stream.online.adaptation import get_status as get_adaptation_status
+            adapt = get_adaptation_status()
+            state = adapt["state"]
+            state_colors = {"STABLE": "var(--fg-green)", "DRIFT_DETECTED": "var(--fg-red)",
+                           "ADAPTING": "var(--fg-orange)", "STABILIZING": "var(--fg-orange)", "RECOVERED": "var(--fg-green)"}
+            state_color = state_colors.get(state, "var(--fg-dim)")
+
+            parts.append(
+                Div(
+                    H4("ADAPTATION", style="color: var(--fg-dim); font-size: 10px; margin-top: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+                    Div(
+                        Span("STATE: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                        Span(state, style=f"color: {state_color}; font-weight: bold; font-size: 12px;",
+                             cls="adapting-glow" if state == "ADAPTING" else ""),
+                        Span(f"  SIGNALS: {adapt['drift_signals']}/{adapt['consecutive_threshold']}",
+                             style="color: var(--fg-subtle); margin-left: 12px; font-size: 11px;"),
+                    ),
+                    Div(
+                        Button("FORCE ADAPTATION", cls="spark-btn",
+                               style="margin-top: 12px; border-color: var(--fg-orange); color: var(--fg-orange);",
+                               **{"hx-post": "/api/v1/online/adaptation/force", "hx-target": "#drift-panel", "hx-swap": "innerHTML"}),
+                    ) if state in ("STABLE", "RECOVERED") else Div(),
+                ),
+            )
+
+            # Adaptation log
+            if adapt["log"]:
+                log_items = []
+                for entry in adapt["log"][-5:]:
+                    log_items.append(
+                        P(f"[{entry['event']}] {entry['message']}",
+                          style="color: var(--fg-subtle); font-size: 10px; margin: 2px 0;"),
+                    )
+                parts.append(Div(*log_items, style="margin-top: 8px; padding: 8px; border: 1px solid var(--highlight-med); background: rgba(35, 33, 54, 0.5);"))
+        except Exception:
+            pass
+
         return Div(*parts)
 
     @rt("/api/v1/drift/distribution")
@@ -1397,6 +1501,161 @@ def register_api_routes(rt):
             return Div(*parts, id="investigation-panel",
                        **{"hx-get": f"/api/v1/agent/investigation/{tx_id}", "hx-trigger": "every 2s", "hx-swap": "innerHTML"})
         return Div(*parts)
+
+    # === ADWIN ===
+
+    @rt("/api/v1/drift/adwin")
+    def adwin_status():
+        from stream.drift.monitor import get_adwin_status
+        return get_adwin_status()
+
+    # === ANOMALY ===
+
+    @rt("/api/v1/anomaly/status")
+    def anomaly_status():
+        from stream.anomaly.detector import get_anomaly_status
+        status = get_anomaly_status()
+        calibrated = status["is_calibrated"]
+        return Div(
+            Div(
+                Span("DETECTOR: ", style="color: var(--fg-dim); font-size: 10px; letter-spacing: 1px;"),
+                Span("CALIBRATED" if calibrated else "CALIBRATING",
+                     style=f"color: {'var(--fg-green)' if calibrated else 'var(--fg-dim)'}; font-weight: bold; font-size: 12px;"),
+            ),
+            DataGrid(
+                DataReadout("SAMPLES", str(status["n_samples"])),
+                DataReadout("GRACE LEFT", str(status["grace_remaining"])),
+            ),
+        )
+
+    # === ONLINE METRICS ===
+
+    @rt("/api/v1/online/metrics")
+    def online_metrics():
+        from stream.online.metrics import get_snapshot
+        snap = get_snapshot()
+        if snap["n_labels"] == 0:
+            return Div(P("No labels yet. Review alerts to populate metrics.",
+                        style="color: var(--fg-dim); font-size: 11px;"))
+
+        cum = snap["cumulative"]
+        rol = snap["rolling"]
+        return Div(
+            H4("CUMULATIVE", style="color: var(--fg-dim); font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+            DataGrid(
+                DataReadout("PRECISION", f"{cum['precision']:.3f}"),
+                DataReadout("RECALL", f"{cum['recall']:.3f}"),
+                DataReadout("F1", f"{cum['f1']:.3f}", highlight=True),
+                DataReadout("ROCAUC", f"{cum['rocauc']:.3f}"),
+            ),
+            H4("ROLLING (50)", style="color: var(--fg-dim); font-size: 10px; margin-top: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;"),
+            DataGrid(
+                DataReadout("PRECISION", f"{rol['precision']:.3f}"),
+                DataReadout("RECALL", f"{rol['recall']:.3f}"),
+                DataReadout("F1", f"{rol['f1']:.3f}", highlight=True),
+                DataReadout("ROCAUC", f"{rol['rocauc']:.3f}"),
+            ),
+            Div(
+                Span(f"LABELS: {snap['n_labels']}", style="color: var(--fg-subtle); font-size: 10px; letter-spacing: 1px;"),
+                style="margin-top: 8px;",
+            ),
+        )
+
+    # === MODEL RACE ===
+
+    @rt("/api/v1/online/race/standings")
+    def race_standings():
+        from stream.online.race import get_race
+        race = get_race()
+        standings = race.get_standings()
+        if not standings or standings[0]["n_total"] == 0:
+            return Div(P("No race data yet. Review alerts to start the race.",
+                        style="color: var(--fg-dim); font-size: 11px;"))
+
+        rows = []
+        for i, s in enumerate(standings):
+            medal = ["1st", "2nd", "3rd"][i] if i < 3 else ""
+            color = "var(--fg-green)" if i == 0 else "var(--fg-white)"
+            rows.append(Tr(
+                Td(medal, style=f"color: {color}; font-weight: bold;"),
+                Td(s["name"], style=f"color: {color};"),
+                Td(f"{s['rolling_f1']:.3f}", style=f"color: {color};"),
+                Td(f"{s['rolling_accuracy']:.3f}"),
+                Td(f"{s['cumulative_f1']:.3f}"),
+                Td(str(s["n_total"])),
+            ))
+
+        return Table(
+            Thead(Tr(Th("Rank"), Th("Model"), Th("Rolling F1"), Th("Rolling Acc"), Th("Cum F1"), Th("Samples"))),
+            Tbody(*rows),
+            cls="spark-table",
+        )
+
+    @rt("/api/v1/online/race/convergence")
+    def race_convergence():
+        from stream.online.race import get_race
+        race = get_race()
+        data = race.get_convergence_data()
+
+        # Build Plotly chart
+        traces = []
+        colors = {"LogisticRegression": "#9ccfd8", "HoeffdingTree": "#f6c177", "GaussianNB": "#c4a7e7"}
+        for name, history in data.items():
+            if not history:
+                continue
+            traces.append({
+                "x": [h["sample"] for h in history],
+                "y": [h["f1"] for h in history],
+                "name": name,
+                "type": "scatter",
+                "mode": "lines",
+                "line": {"color": colors.get(name, "#eae8ff"), "width": 2},
+            })
+
+        if not traces:
+            return Div(P("No convergence data yet.", style="color: var(--fg-dim); font-size: 11px;"))
+
+        import json as _json
+        chart_spec = _json.dumps({
+            "data": traces,
+            "layout": {
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Courier New", "color": "#eae8ff", "size": 10},
+                "margin": {"l": 40, "r": 20, "t": 30, "b": 40},
+                "xaxis": {"title": "Sample", "gridcolor": "rgba(224,222,244,0.08)", "zerolinecolor": "rgba(224,222,244,0.08)"},
+                "yaxis": {"title": "Rolling F1", "range": [0, 1], "gridcolor": "rgba(224,222,244,0.08)", "zerolinecolor": "rgba(224,222,244,0.08)"},
+                "legend": {"orientation": "h", "y": -0.2},
+                "title": {"text": "MODEL RACE CONVERGENCE", "font": {"size": 11, "color": "#837f9b"}},
+            },
+        })
+
+        return Div(
+            Div(id="race-convergence-chart", style="width: 100%; height: 280px;"),
+            Script(src="https://cdn.plot.ly/plotly-2.35.2.min.js"),
+            Script(f"""(function() {{
+                var spec = {chart_spec};
+                Plotly.newPlot('race-convergence-chart', spec.data, spec.layout, {{responsive: true, displayModeBar: false}});
+            }})();"""),
+        )
+
+    # === ADAPTATION ===
+
+    @rt("/api/v1/online/adaptation/status")
+    def adaptation_status():
+        from stream.online.adaptation import get_status
+        return get_status()
+
+    @rt("/api/v1/online/adaptation/force", methods=["POST"])
+    def force_adaptation():
+        from stream.online.adaptation import force_adaptation as _force
+        result = _force()
+        # Return updated drift panel
+        return Div(
+            P(f"ADAPTATION TRIGGERED", style="color: var(--fg-orange); font-weight: bold; font-size: 12px; text-align: center; padding: 8px; border: 1px solid var(--fg-orange); margin-bottom: 12px;"),
+            Div(id="drift-panel",
+                **{"hx-get": "/api/v1/drift/status", "hx-trigger": "load, every 10s", "hx-swap": "innerHTML"}),
+        )
 
     # === INTEGRATION ===
 
@@ -1521,6 +1780,9 @@ def register_api_routes(rt):
                         badge_cls = "model-badge model-badge-ml" if is_ml else "model-badge"
                         badge_text = "ML" if is_ml else "HEURISTIC"
 
+                        anomaly_score = result.get("anomaly_score", 0.0)
+                        anomaly_cls = "anomaly-high" if anomaly_score > 0.7 else "anomaly-med" if anomaly_score > 0.4 else "anomaly-low"
+
                         html = f"""<div class="feed-row {'high-risk' if risk_score > thresh else ''}">
                             <div style="color: var(--fg-dim);">{now}</div>
                             <div style="font-weight: bold;">{txid[:16]}...</div>
@@ -1528,6 +1790,7 @@ def register_api_routes(rt):
                             <div>{fee_rate:.1f} sat/vB</div>
                             <div class="{risk_cls}">{risk_score:.3f} <span class="{badge_cls}">{badge_text}</span></div>
                             <div>{risk_label}</div>
+                            <div class="{anomaly_cls}">{anomaly_score:.3f}</div>
                         </div>"""
 
                         yield {"event": "transaction_scored", "data": html}

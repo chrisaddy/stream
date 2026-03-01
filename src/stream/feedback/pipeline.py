@@ -25,6 +25,123 @@ _retrain_status = {
 _learned_model = None
 _model_metadata = None
 
+# River online model state
+_river_model = None
+_river_metrics = None
+_river_n_samples = 0
+_river_n_positive = 0
+_river_n_negative = 0
+
+
+def _init_river_model():
+    """Create a River online learning pipeline: StandardScaler → LogisticRegression."""
+    from river.compose import Pipeline
+    from river.linear_model import LogisticRegression
+    from river.preprocessing import StandardScaler
+
+    global _river_model, _river_metrics
+    _river_model = Pipeline(StandardScaler(), LogisticRegression(l2=0.01))
+    from river.metrics import Accuracy
+    _river_metrics = Accuracy()
+
+
+def river_learn_one(fee_rate: float, vsize: float, fee: float, label: int):
+    """Test-then-train: predict first (update metric), then learn."""
+    global _river_model, _river_metrics, _river_n_samples, _river_n_positive, _river_n_negative
+
+    if _river_model is None:
+        _init_river_model()
+
+    x = {"fee_rate": fee_rate, "vsize": vsize, "fee": fee}
+    y = bool(label)
+
+    # Test: predict before learning (for metric tracking)
+    y_pred = _river_model.predict_one(x)
+    if y_pred is not None:
+        _river_metrics.update(y, y_pred)
+
+    # Train
+    _river_model.learn_one(x, y)
+    _river_n_samples += 1
+    if label:
+        _river_n_positive += 1
+    else:
+        _river_n_negative += 1
+
+    log.info("River learn_one", n_samples=_river_n_samples, label=label,
+             n_pos=_river_n_positive, n_neg=_river_n_negative)
+
+
+def river_predict_one(fee_rate: float, vsize: float, fee: float) -> float | None:
+    """Return P(class=True) if model is ready (has seen both classes), else None."""
+    model = get_river_model()
+    if model is None:
+        return None
+    x = {"fee_rate": fee_rate, "vsize": vsize, "fee": fee}
+    try:
+        proba = model.predict_proba_one(x)
+        return proba.get(True, proba.get(1, 0.0))
+    except Exception:
+        return None
+
+
+def get_river_model():
+    """Return the River model only if it has seen both classes."""
+    if _river_model is None or _river_n_positive < 1 or _river_n_negative < 1:
+        return None
+    return _river_model
+
+
+def get_river_metrics() -> dict:
+    """Return River model status and metrics."""
+    is_ready = _river_n_positive >= 1 and _river_n_negative >= 1
+    return {
+        "n_samples": _river_n_samples,
+        "n_positive": _river_n_positive,
+        "n_negative": _river_n_negative,
+        "accuracy": float(_river_metrics.get()) if _river_metrics and _river_n_samples > 0 else 0.0,
+        "is_ready": is_ready,
+    }
+
+
+def warm_up_river_model():
+    """Replay all existing ReviewRecords through River learn_one at startup."""
+    from stream.models.alerts import AlertRecord
+    from stream.models.reviews import ReviewRecord
+
+    if _river_model is None:
+        _init_river_model()
+
+    db = SessionLocal()
+    try:
+        reviews = db.query(ReviewRecord).order_by(ReviewRecord.reviewed_at).all()
+        if not reviews:
+            log.info("River warm-up: no reviews to replay")
+            return
+
+        tx_ids = [r.tx_id for r in reviews]
+        alerts = db.query(AlertRecord).filter(AlertRecord.tx_id.in_(tx_ids)).all()
+        alert_map = {a.tx_id: a for a in alerts}
+
+        replayed = 0
+        for review in reviews:
+            alert = alert_map.get(review.tx_id)
+            if not alert or not alert.raw_input:
+                continue
+            raw = alert.raw_input
+            fee_rate = raw.get("fee_rate", 0)
+            vsize = raw.get("vsize", 0)
+            fee = raw.get("fee", 0)
+            label = 1 if review.verdict == "true_positive" else 0
+            river_learn_one(fee_rate, vsize, fee, label)
+            replayed += 1
+
+        log.info("River warm-up complete", replayed=replayed, n_samples=_river_n_samples)
+    except Exception as e:
+        log.warning("River warm-up failed", error=str(e))
+    finally:
+        db.close()
+
 
 def get_retrain_status() -> dict:
     return dict(_retrain_status)

@@ -54,6 +54,13 @@ async def on_startup():
     except Exception as e:
         log.warning("Lightning features loading failed on startup", error=str(e))
 
+    # 5. Warm up River online model from existing reviews
+    try:
+        from stream.feedback.pipeline import warm_up_river_model
+        warm_up_river_model()
+    except Exception as e:
+        log.warning("River warm-up failed on startup", error=str(e))
+
 
 # Create FastHTML app with static file serving
 app, rt = fast_app(

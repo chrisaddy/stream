@@ -113,6 +113,15 @@ def _heuristic_explanation(fee_rate: float, vsize: int, fee: int) -> list[dict]:
     return factors
 
 
+def _try_river_model(fee_rate: float, vsize: int, fee: int) -> float | None:
+    """Attempt scoring with the River online model. Returns score or None."""
+    try:
+        from stream.feedback.pipeline import river_predict_one
+        return river_predict_one(fee_rate, vsize, fee)
+    except Exception:
+        return None
+
+
 def _try_learned_model(fee_rate: float, vsize: int, fee: int) -> float | None:
     """Attempt scoring with the learned feedback model. Returns score or None."""
     try:
@@ -128,30 +137,49 @@ def _try_learned_model(fee_rate: float, vsize: int, fee: int) -> float | None:
         return None
 
 
+def _get_anomaly_score(fee_rate: float, vsize: int, fee: int) -> float:
+    """Get anomaly score from Half-Space Trees detector."""
+    try:
+        from stream.anomaly.detector import score_anomaly
+        return score_anomaly(fee_rate, vsize, fee)
+    except Exception:
+        return 0.0
+
+
 async def score_transaction(
     txid: str, vsize: int, fee: int
 ) -> dict:
-    """Score a live transaction — prefers learned model, falls back to heuristic.
+    """Score a live transaction — prefers River → learned model → heuristic.
 
-    If a feedback-trained model exists (from analyst reviews), use it.
-    Otherwise fall back to the transparent sigmoid-based heuristic.
+    Scoring cascade: River online model first, then batch LightGBM, then heuristic.
     """
     start = time.time()
 
     fee_rate = fee / max(vsize, 1)
 
-    # Try learned model first
-    learned_score = _try_learned_model(fee_rate, vsize, fee)
-    if learned_score is not None:
-        risk_score = round(learned_score, 4)
-        model_name = "live-heuristic-v2"
-        model_version = "v2.0"
+    # Try River online model first
+    river_score = _try_river_model(fee_rate, vsize, fee)
+    if river_score is not None:
+        risk_score = round(river_score, 4)
+        model_name = "river-online"
+        model_version = "v3.0"
         shap_features = _heuristic_explanation(fee_rate, vsize, fee)
     else:
-        risk_score = _heuristic_risk_score(fee_rate, vsize, fee)
-        model_name = "live-heuristic"
-        model_version = "v1.0"
-        shap_features = _heuristic_explanation(fee_rate, vsize, fee)
+        # Try batch learned model
+        learned_score = _try_learned_model(fee_rate, vsize, fee)
+        if learned_score is not None:
+            risk_score = round(learned_score, 4)
+            model_name = "live-heuristic-v2"
+            model_version = "v2.0"
+            shap_features = _heuristic_explanation(fee_rate, vsize, fee)
+        else:
+            risk_score = _heuristic_risk_score(fee_rate, vsize, fee)
+            model_name = "live-heuristic"
+            model_version = "v1.0"
+            shap_features = _heuristic_explanation(fee_rate, vsize, fee)
+
+    # Anomaly detection (independent of risk scoring)
+    anomaly_score = _get_anomaly_score(fee_rate, vsize, fee)
 
     inference_ms = (time.time() - start) * 1000
     threshold = get_risk_threshold()
@@ -176,5 +204,6 @@ async def score_transaction(
         "model_version": model_version,
         "input_hash": input_hash,
         "shap_features": shap_features,
+        "anomaly_score": round(anomaly_score, 4),
         "is_demo": False,
     }
