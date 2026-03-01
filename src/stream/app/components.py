@@ -190,7 +190,7 @@ def NavSidebar(current_path: str = "/"):
 def Page(title: str, current_path: str, *children):
     return (
         Title(f"STREAM // {title}"),
-        Link(rel="stylesheet", href="/static/style.css"),
+        Link(rel="stylesheet", href="/style.css"),
         Script(src="https://unpkg.com/htmx.org@2.0.4"),
         Script(src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"),
         NoiseOverlay(),
