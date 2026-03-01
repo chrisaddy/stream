@@ -1069,21 +1069,28 @@ def register_api_routes(rt):
 
         async def event_generator():
             import asyncio
-            seen = set()
+            last_seen = set()
 
             while True:
                 try:
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         resp = await client.get("https://mempool.space/api/mempool/recent")
-                        txs = resp.json()[:5]
+                        txs = resp.json()
 
-                    for tx in txs:
+                    # Only dedupe within a single poll — if the API returns
+                    # the same txs next poll, we score them again (keeps the
+                    # feed alive even when mempool is slow).
+                    current_batch = set()
+                    new_txs = [t for t in txs if t.get("txid", "") not in last_seen]
+                    # If everything is stale, just rescore the batch anyway
+                    if not new_txs:
+                        new_txs = txs
+
+                    for tx in new_txs:
                         txid = tx.get("txid", "")
-                        if txid in seen:
+                        if txid in current_batch:
                             continue
-                        seen.add(txid)
-                        if len(seen) > 500:
-                            seen.clear()
+                        current_batch.add(txid)
 
                         vsize = tx.get("vsize", tx.get("size", 0))
                         fee = tx.get("fee", 0)
@@ -1108,35 +1115,37 @@ def register_api_routes(rt):
 
                         yield {"event": "transaction_scored", "data": html}
 
-                        # Persist prediction audit (best-effort)
-                        try:
-                            await write_in_thread(save_prediction, {
-                                "model_name": result["model_name"],
-                                "model_version": result["model_version"],
-                                "input_hash": result["input_hash"],
-                                "risk_score": risk_score,
-                                "risk_label": risk_label,
-                                "threshold_used": get_risk_threshold(),
-                                "top_shap_features": result["shap_features"],
-                                "inference_time_ms": result["inference_ms"],
-                            })
-
-                            # Create alert if above threshold
-                            if risk_score > get_risk_threshold():
-                                await write_in_thread(save_alert, {
-                                    "tx_id": txid,
+                        # Persist prediction audit (best-effort, only for genuinely new txs)
+                        if txid not in last_seen:
+                            try:
+                                await write_in_thread(save_prediction, {
+                                    "model_name": result["model_name"],
+                                    "model_version": result["model_version"],
+                                    "input_hash": result["input_hash"],
                                     "risk_score": risk_score,
                                     "risk_label": risk_label,
-                                    "model_name": result["model_name"],
-                                    "explanation": result["shap_features"],
+                                    "threshold_used": thresh,
+                                    "top_shap_features": result["shap_features"],
+                                    "inference_time_ms": result["inference_ms"],
                                 })
-                        except Exception:
-                            pass
+
+                                if risk_score > thresh:
+                                    await write_in_thread(save_alert, {
+                                        "tx_id": txid,
+                                        "risk_score": risk_score,
+                                        "risk_label": risk_label,
+                                        "model_name": result["model_name"],
+                                        "explanation": result["shap_features"],
+                                    })
+                            except Exception:
+                                pass
+
+                    last_seen = current_batch
 
                 except Exception as e:
                     log.debug("Stream error", error=str(e))
 
-                await asyncio.sleep(10)
+                await asyncio.sleep(1)
 
         return EventSourceResponse(event_generator())
 
