@@ -27,6 +27,26 @@ def home_page():
             footer_right="LIVE_DATA",
         ),
 
+        # Demo video
+        DiagnosticFrame(
+            "DEMO",
+
+            Video(
+                Source(src="/demo.mp4", type="video/mp4"),
+                controls=True,
+                style="width: 100%; border-radius: 4px; border: 1px solid var(--highlight-med);",
+                preload="metadata",
+            ),
+
+            P("4-minute walkthrough: live scoring, instant learning, drift detection, "
+              "self-healing adaptation, and anomaly detection — all on real Bitcoin mempool data.",
+              style="color: var(--fg-subtle); font-size: 11px; margin-top: 8px;"),
+
+            status="WALKTHROUGH",
+            footer_left="SCREEN CAPTURE + AI NARRATION",
+            footer_right="4:20",
+        ),
+
         DiagnosticFrame(
             "MEMPOOL STATUS",
 
@@ -76,12 +96,6 @@ def home_page():
                 Div(
                     id="score-feed",
                     cls="scroll-feed",
-                    **{
-                        "hx-ext": "sse",
-                        "sse-connect": "/api/v1/stream/scores",
-                        "sse-swap": "transaction_scored",
-                        "hx-swap": "afterbegin",
-                    },
                     style="min-height: 300px;",
                 ),
 
@@ -243,7 +257,7 @@ def home_page():
             footer_right="ADAPTIVE_ENSEMBLE",
         ),
 
-        # Oscilloscope JS — reacts to incoming SSE scores
+        # Oscilloscope + SSE feed JS
         Script("""
         const canvas = document.getElementById('oscilloscope');
         if (canvas) {
@@ -252,6 +266,7 @@ def home_page():
             const scoreHistory = [];
             const anomalyHistory = [];
             const MAX_POINTS = 200;
+            const MAX_FEED_ROWS = 50;
 
             function resize() {
                 width = canvas.parentElement.clientWidth;
@@ -262,11 +277,21 @@ def home_page():
             window.addEventListener('resize', resize);
             resize();
 
-            // Listen for new scores from the SSE feed
-            document.addEventListener('htmx:sseMessage', function(e) {
+            // Native EventSource connection (replaces HTMX SSE)
+            const feed = document.getElementById('score-feed');
+            const es = new EventSource('/api/v1/stream/scores');
+            es.addEventListener('transaction_scored', function(e) {
                 try {
+                    // Insert into feed
+                    if (feed) {
+                        feed.insertAdjacentHTML('afterbegin', e.data);
+                        while (feed.children.length > MAX_FEED_ROWS) {
+                            feed.removeChild(feed.lastChild);
+                        }
+                    }
+                    // Parse scores for oscilloscope
                     const el = document.createElement('div');
-                    el.innerHTML = e.detail.data;
+                    el.innerHTML = e.data;
                     const riskEl = el.querySelector('.risk-low, .risk-medium, .risk-high');
                     if (riskEl) {
                         const score = parseFloat(riskEl.textContent);

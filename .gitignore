@@ -12,3 +12,11 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+.DS_Store
+
+# Demo media (regenerate with demo/record.sh + ffmpeg)
+demo/clips/
+demo/narration/
+demo/voice-samples/
+src/stream/app/static/*.mp4

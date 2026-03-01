@@ -154,4 +154,4 @@ def _log_event(event_type: str, message: str):
         "message": message,
     }
     _adaptation_log.append(entry)
-    log.info("Adaptation event", event=event_type, message=message)
+    log.info("Adaptation event", event_type=event_type, detail=message)
