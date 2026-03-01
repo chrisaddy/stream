@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 /* Main layout */
 .app-layout {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 200px 1fr;
     min-height: 100vh;
 }
 
@@ -52,8 +52,9 @@ a:hover { text-decoration: underline; }
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    width: max-content;
-    min-width: 160px;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .nav-brand {
@@ -67,15 +68,6 @@ a:hover { text-decoration: underline; }
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--fg-green);
-    margin-bottom: 4px;
-}
-
-.nav-brand .badge {
-    border: 1px solid var(--fg-dim);
-    padding: 2px 5px;
-    font-size: 8px;
-    color: var(--fg-dim);
-    letter-spacing: 1px;
 }
 
 .nav-section {

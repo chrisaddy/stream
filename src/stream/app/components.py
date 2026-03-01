@@ -152,11 +152,7 @@ def NavLink(text: str, href: str, active: bool = False):
 
 def NavSidebar(current_path: str = "/"):
     return Nav(
-        Div(
-            H1("STREAM"),
-            Div("Bitcoin ML Infrastructure", cls="badge"),
-            cls="nav-brand",
-        ),
+        Div(H1("STREAM"), cls="nav-brand"),
         Div(
             Div("DASHBOARD", cls="nav-section-title"),
             NavLink("Signal Feed", "/", active=current_path == "/"),
