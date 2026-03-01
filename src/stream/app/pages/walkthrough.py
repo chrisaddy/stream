@@ -12,8 +12,8 @@ def walkthrough_overview():
             "STREAM // WALKTHROUGH",
 
             WalkthroughSection(
-                "Why These Projects for River",
-                "River Financial is building a dedicated ML team. They need fraud detection with compliance-ready explainability, real-time fee estimation, and the MLOps platform to run it all. This portfolio demonstrates exactly that infrastructure — deployed live, not in a notebook.",
+                "Why These Projects",
+                "Regulated Bitcoin exchanges need fraud detection with compliance-ready explainability, real-time fee estimation, and the MLOps platform to run it all. This portfolio demonstrates exactly that infrastructure — deployed live, not in a notebook.",
             ),
 
             WalkthroughSection(
@@ -28,7 +28,7 @@ def walkthrough_overview():
 
             WalkthroughSection(
                 "Tech Stack Rationale",
-                "Prefect over Airflow: Python-native, better for small teams, modern API. FastHTML over React: Python full-stack, matches Elixir/LiveView philosophy at River, HTMX for interactivity without JS frameworks. XGBoost for production speed + SHAP explainability. GCN to show when graph structure adds value.",
+                "Prefect over Airflow: Python-native, better for small teams, modern API. FastHTML over React: Python full-stack, HTMX for interactivity without JS frameworks. XGBoost for production speed + SHAP explainability. GCN to show when graph structure adds value.",
             ),
 
             WalkthroughSection(
@@ -50,7 +50,7 @@ def walkthrough_illicit():
 
             WalkthroughSection(
                 "The Problem: Bitcoin AML at a Regulated Exchange",
-                "River holds a BitLicense and state money transmitter licenses. Every transaction must be screened for illicit activity. False negatives mean regulatory fines (potentially millions). False positives mean customer friction and support costs. ML automates the triage, not the decision.",
+                "A regulated exchange with a BitLicense and state money transmitter licenses must screen every transaction for illicit activity. False negatives mean regulatory fines (potentially millions). False positives mean customer friction and support costs. ML automates the triage, not the decision.",
             ),
 
             WalkthroughSection(
@@ -148,25 +148,8 @@ def walkthrough_architecture():
             ),
 
             WalkthroughSection(
-                "Integration with Elixir/Phoenix",
-                "River's backend is Elixir/Phoenix. This Python ML service exposes a JSON API. The integration pattern: Elixir GenServer calls our scoring endpoint via HTTP. In production, this would go through RabbitMQ (AMQP): transaction published to scoring queue -> ML service consumes, scores, publishes result -> Elixir picks up risk score.",
-                """# Elixir GenServer calling pattern:
-defmodule River.ML.ScoringClient do
-  use GenServer
-
-  def score_transaction(features) do
-    GenServer.call(__MODULE__, {:score, features})
-  end
-
-  def handle_call({:score, features}, _from, state) do
-    {:ok, response} = HTTPoison.post(
-      "#{state.ml_service_url}/api/v1/integration/webhook",
-      Jason.encode!(%{features: features, correlation_id: UUID.uuid4()}),
-      [{"Content-Type", "application/json"}]
-    )
-    {:reply, Jason.decode!(response.body), state}
-  end
-end""",
+                "Integration Pattern",
+                "This Python ML service exposes a JSON API. Backend services call the scoring endpoint via HTTP. In production, this would go through a message queue (AMQP): transaction published to scoring queue -> ML service consumes, scores, publishes result -> backend picks up risk score.",
             ),
 
             WalkthroughSection(
