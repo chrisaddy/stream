@@ -138,12 +138,14 @@ def home_page():
             cls="triple-row",
         ),
 
-        # Oscilloscope JS
+        # Oscilloscope JS — reacts to incoming SSE scores
         Script("""
         const canvas = document.getElementById('oscilloscope');
         if (canvas) {
             const ctx = canvas.getContext('2d');
             let width, height, time = 0;
+            const scoreHistory = [];
+            const MAX_POINTS = 200;
 
             function resize() {
                 width = canvas.parentElement.clientWidth;
@@ -154,39 +156,79 @@ def home_page():
             window.addEventListener('resize', resize);
             resize();
 
-            const inputs = [
-                {speed: 0.02, amp: 30, offset: 0},
-                {speed: 0.03, amp: 20, offset: 100},
-                {speed: 0.015, amp: 40, offset: 200},
-            ];
+            // Listen for new scores from the SSE feed
+            document.addEventListener('htmx:sseMessage', function(e) {
+                try {
+                    const el = document.createElement('div');
+                    el.innerHTML = e.detail.data;
+                    const riskEl = el.querySelector('.risk-low, .risk-medium, .risk-high');
+                    if (riskEl) {
+                        const score = parseFloat(riskEl.textContent);
+                        if (!isNaN(score)) {
+                            scoreHistory.push(score);
+                            if (scoreHistory.length > MAX_POINTS) scoreHistory.shift();
+                        }
+                    }
+                } catch(err) {}
+            });
 
             function draw() {
                 ctx.clearRect(0, 0, width, height);
                 const cy = height / 2;
-                const cx = width / 2;
                 time += 1;
 
-                inputs.forEach((inp, i) => {
-                    ctx.beginPath();
-                    ctx.strokeStyle = `rgba(255,255,255,${0.2 + Math.sin(time*0.05+i)*0.15})`;
-                    ctx.lineWidth = 1;
-                    for (let x = 0; x < cx; x += 4) {
-                        const p = x / cx;
-                        const m = 1 - Math.pow(p, 3);
-                        const wave = Math.sin(x * inp.speed + time * inp.speed + inp.offset) * inp.amp;
-                        const noise = (Math.random() - 0.5) * 20 * m;
-                        const y = cy + (wave + noise) * m + (i-1) * 30 * m;
-                        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                    }
-                    ctx.stroke();
-                });
-
+                // Background wave — ambient signal
                 ctx.beginPath();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#9ccfd8';
-                ctx.moveTo(cx, cy);
-                ctx.lineTo(width, cy);
+                ctx.strokeStyle = 'rgba(156, 207, 216, 0.15)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < width; x += 3) {
+                    const wave = Math.sin(x * 0.02 + time * 0.02) * 20
+                               + Math.sin(x * 0.035 + time * 0.015) * 15;
+                    const noise = (Math.random() - 0.5) * 6;
+                    const y = cy + wave + noise;
+                    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
                 ctx.stroke();
+
+                // Score trace — bright line showing recent risk scores
+                if (scoreHistory.length > 1) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#9ccfd8';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = 'rgba(156, 207, 216, 0.6)';
+                    ctx.shadowBlur = 8;
+                    const step = width / MAX_POINTS;
+                    const startX = width - scoreHistory.length * step;
+                    scoreHistory.forEach((s, i) => {
+                        const x = startX + i * step;
+                        const y = height - (s * height * 0.9) - height * 0.05;
+                        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Score dots for high-risk
+                    scoreHistory.forEach((s, i) => {
+                        if (s > 0.3) {
+                            const x = startX + i * step;
+                            const y = height - (s * height * 0.9) - height * 0.05;
+                            ctx.beginPath();
+                            ctx.fillStyle = s > 0.5 ? '#eb6f92' : '#f6c177';
+                            ctx.arc(x, y, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+                } else {
+                    // Waiting for data — show flat baseline with pulse
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(156, 207, 216, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 8]);
+                    ctx.moveTo(0, cy);
+                    ctx.lineTo(width, cy);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
 
                 requestAnimationFrame(draw);
             }

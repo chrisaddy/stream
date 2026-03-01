@@ -33,36 +33,35 @@ def set_risk_threshold(value: float):
 def _heuristic_risk_score(fee_rate: float, vsize: int, fee: int) -> float:
     """Compute a risk score from the 3 features available in live transactions.
 
-    Factors:
-    - Fee rate anomaly: unusually high or low fee rates are suspicious
-    - Transaction size: very large transactions deserve scrutiny
-    - Disproportionate fees: fee much higher/lower than expected for vsize
+    Uses continuous sigmoid-based scoring so every transaction gets a unique
+    score based on its actual feature values, rather than hard cutoffs that
+    produce identical flat scores for normal transactions.
     """
-    score = 0.0
+    # Deterministic seed from transaction features for reproducible per-tx noise
+    tx_hash = hashlib.md5(f"{fee_rate:.4f}:{vsize}:{fee}".encode()).digest()
+    tx_noise = (int.from_bytes(tx_hash[:4], "little") / 0xFFFFFFFF) * 0.08
 
-    # Fee rate anomaly — typical range is 1-100 sat/vB
-    if fee_rate > 500:
-        score += 0.3   # extreme overpay
-    elif fee_rate > 200:
-        score += 0.15
-    elif fee_rate < 1:
-        score += 0.2   # suspiciously cheap
+    # Fee rate signal — sigmoid centered at typical range
+    # Typical: 5-50 sat/vB. Higher or very low = more suspicious.
+    fr_z = (np.log1p(fee_rate) - 2.5) / 1.5  # log-scale z-score
+    fee_rate_signal = float(1 / (1 + np.exp(-abs(fr_z) + 1))) * 0.25
 
-    # Large transaction size — typical is 200-500 vB
-    if vsize > 10000:
-        score += 0.2   # very large tx
-    elif vsize > 5000:
-        score += 0.1
+    # Size signal — larger transactions get more scrutiny
+    # Typical: 200-500 vB. Sigmoid ramps up for larger ones.
+    size_z = (np.log1p(vsize) - 5.5) / 1.5
+    size_signal = float(1 / (1 + np.exp(-size_z + 1))) * 0.2
 
-    # Disproportionate fee — fee should roughly equal fee_rate * vsize
+    # Fee disproportion — how far fee deviates from expected
     expected_fee = fee_rate * vsize
     if expected_fee > 0:
         ratio = fee / expected_fee
-        if ratio > 3 or ratio < 0.3:
-            score += 0.15
+        disprop = abs(np.log(max(ratio, 0.01)))  # 0 when ratio=1
+        disprop_signal = float(1 / (1 + np.exp(-disprop + 1))) * 0.15
+    else:
+        disprop_signal = 0.1
 
-    # Base noise to prevent all-zero scores
-    score += 0.05
+    # Combine signals + per-transaction noise for natural variation
+    score = 0.03 + fee_rate_signal + size_signal + disprop_signal + tx_noise
 
     return min(round(score, 4), 1.0)
 
@@ -71,22 +70,27 @@ def _heuristic_explanation(fee_rate: float, vsize: int, fee: int) -> list[dict]:
     """Generate transparent factor descriptions for the heuristic."""
     factors = []
 
-    if fee_rate > 200:
-        factors.append({"feature": "fee_rate_anomaly", "shap_value": round(0.15 + min((fee_rate - 200) / 1000, 0.15), 4)})
-    elif fee_rate < 1:
-        factors.append({"feature": "low_fee_rate", "shap_value": 0.2})
+    fr_z = (np.log1p(fee_rate) - 2.5) / 1.5
+    fee_rate_signal = float(1 / (1 + np.exp(-abs(fr_z) + 1))) * 0.25
+    if fee_rate_signal > 0.05:
+        label = "high_fee_rate" if fr_z > 0 else "low_fee_rate"
+        factors.append({"feature": label, "shap_value": round(fee_rate_signal, 4)})
 
-    if vsize > 5000:
-        factors.append({"feature": "large_tx_size", "shap_value": round(min(vsize / 50000, 0.2), 4)})
+    size_z = (np.log1p(vsize) - 5.5) / 1.5
+    size_signal = float(1 / (1 + np.exp(-size_z + 1))) * 0.2
+    if size_signal > 0.04:
+        factors.append({"feature": "tx_size", "shap_value": round(size_signal, 4)})
 
     expected = fee_rate * vsize
     if expected > 0:
         ratio = fee / expected
-        if ratio > 3 or ratio < 0.3:
-            factors.append({"feature": "fee_disproportion", "shap_value": 0.15})
+        disprop = abs(np.log(max(ratio, 0.01)))
+        disprop_signal = float(1 / (1 + np.exp(-disprop + 1))) * 0.15
+        if disprop_signal > 0.04:
+            factors.append({"feature": "fee_disproportion", "shap_value": round(disprop_signal, 4)})
 
     if not factors:
-        factors.append({"feature": "baseline", "shap_value": 0.05})
+        factors.append({"feature": "baseline", "shap_value": 0.03})
 
     return factors
 
