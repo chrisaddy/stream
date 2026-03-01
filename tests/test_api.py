@@ -60,10 +60,9 @@ def test_models_page_removed(client):
     assert resp.status_code == 404
 
 
-def test_pipeline_page(client):
+def test_pipeline_page_removed(client):
     resp = client.get("/pipeline")
-    assert resp.status_code == 200
-    assert "System Status" in resp.text or "SYSTEM STATUS" in resp.text
+    assert resp.status_code == 404
 
 
 def test_random_sample(client):

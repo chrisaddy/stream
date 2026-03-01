@@ -16,7 +16,6 @@ from stream.app.pages.fees import fees_page
 from stream.app.pages.lightning import lightning_page
 from stream.app.pages.onboarding import onboarding_page
 from stream.app.pages.alerts import alerts_page
-from stream.app.pages.pipeline import pipeline_page
 from stream.app.pages.walkthrough import (
     walkthrough_overview,
     walkthrough_illicit,
@@ -105,11 +104,6 @@ def onboarding():
 @rt("/alerts")
 def alerts():
     return alerts_page()
-
-
-@rt("/pipeline")
-def pipeline():
-    return pipeline_page()
 
 
 @rt("/walkthrough")
