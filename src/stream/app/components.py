@@ -27,7 +27,7 @@ def DiagnosticFrame(title: str, *children, status: str = "ACTIVE", footer_left: 
             Span(f"[ {status} ]", cls="status"),
             cls="frame-header",
         ),
-        Div(*CrosshairCorners(), ScanLine(), *children, cls="frame-body"),
+        Div(ScanLine(), *children, cls="frame-body"),
         Div(
             Span(footer_left),
             Span(footer_right),
@@ -130,6 +130,34 @@ def WalkthroughSection(title: str, content: str, code: str = None):
     if code:
         children.append(Pre(code, cls="walkthrough-code"))
     return Div(*children, cls="walkthrough-section")
+
+
+METRIC_TIPS = {
+    "PR-AUC": "Area under the Precision-Recall curve. Measures ranking quality for imbalanced classes — higher means better separation of rare positives.",
+    "Precision": "Of all transactions flagged as illicit, what fraction actually were. High precision = fewer false alarms.",
+    "Recall": "Of all truly illicit transactions, what fraction were caught. High recall = fewer missed threats.",
+    "F1": "Harmonic mean of Precision and Recall. Balances the tradeoff between false alarms and missed detections.",
+    "F1 (macro)": "Unweighted average of F1 across all classes. Treats each class equally regardless of size.",
+    "Inference": "Time to score a single transaction. Lower is better for real-time systems.",
+    "Accuracy": "Fraction of all predictions that were correct. Can be misleading with imbalanced classes.",
+    "Log Loss": "Measures calibration of predicted probabilities. Lower means the model's confidence is better aligned with reality.",
+    "MAE": "Mean Absolute Error — average prediction error in original units. Easy to interpret: 'off by X on average'.",
+    "RMSE": "Root Mean Squared Error — penalizes large errors more than MAE. Sensitive to outliers.",
+    "MAPE": "Mean Absolute Percentage Error — prediction error as a percentage. Scale-independent.",
+    "Median AE": "Median Absolute Error — the middle prediction error. More robust to outliers than MAE.",
+    "R²": "Coefficient of determination — fraction of variance explained by the model. 1.0 is perfect, 0 is baseline.",
+    "Samples": "Number of data points used for evaluation.",
+    "Threshold": "Classification cutoff — predictions above this score are flagged. Tuned for business cost.",
+    "Total Cost": "Estimated business cost combining false negatives (missed illicit) and false positives (unnecessary reviews).",
+}
+
+
+def Tip(text: str, tip: str = ""):
+    """Wrap text in a tooltip span. Falls back to plain text if no tip provided."""
+    desc = tip or METRIC_TIPS.get(text, "")
+    if not desc:
+        return text
+    return Span(text, cls="tip", **{"data-tip": desc})
 
 
 def Card(title: str, *children):
