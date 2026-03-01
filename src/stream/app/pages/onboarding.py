@@ -13,7 +13,7 @@ def onboarding_page():
             "ONBOARDING RISK SCORING",
 
             P("Interactive demo: fill out a mock signup form and get a risk score with explanation.",
-              style="color: var(--fg-dim); margin-bottom: 16px;"),
+              style="color: var(--fg-subtle); margin-bottom: 16px;"),
 
             Form(
                 Div(

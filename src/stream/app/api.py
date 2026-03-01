@@ -12,7 +12,7 @@ import structlog
 from fasthtml.common import *
 
 from stream.app.components import (
-    Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge,
+    Card, DataGrid, DataReadout, FeedRow, MetricItem, MetricsRow, StatusBadge, Tip,
 )
 from stream.app.models import get_model, get_model_card, get_cached_features
 from stream.db import write_in_thread, save_prediction, save_alert, SessionLocal
@@ -29,6 +29,47 @@ def register_api_routes(rt):
     @rt("/api/v1/health")
     def health():
         return {"status": "ok", "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(), "models_loaded": bool(get_model("illicit-xgboost"))}
+
+    # === HOME STATS ===
+
+    @rt("/api/v1/home/stats")
+    async def home_stats():
+        from stream.models.predictions import PredictionRecord
+        from sqlalchemy import func
+
+        mempool_size = "—"
+        recommended_fee = "— sat/vB"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get("https://mempool.space/api/mempool")
+                mempool = resp.json()
+                mempool_size = f"{mempool.get('count', 0):,}"
+
+                resp2 = await client.get("https://mempool.space/api/v1/fees/recommended")
+                fees = resp2.json()
+                recommended_fee = f"{fees.get('fastestFee', '—')} sat/vB"
+        except Exception:
+            pass
+
+        tx_scored = 0
+        avg_risk = 0.0
+        try:
+            db = SessionLocal()
+            try:
+                tx_scored = db.query(func.count()).select_from(PredictionRecord).scalar() or 0
+                avg = db.query(func.avg(PredictionRecord.risk_score)).scalar()
+                avg_risk = avg if avg else 0.0
+            finally:
+                db.close()
+        except Exception:
+            pass
+
+        return DataGrid(
+            DataReadout("MEMPOOL_SIZE", mempool_size, highlight=True),
+            DataReadout("TRANSACTIONS_SCORED", f"{tx_scored:04d}"),
+            DataReadout("AVG_RISK_SCORE", f"{avg_risk:.2f}"),
+            DataReadout("RECOMMENDED_FEE", recommended_fee),
+        )
 
     # === ILLICIT DETECTION ===
 
@@ -72,16 +113,16 @@ def register_api_routes(rt):
             Table(
                 Thead(Tr(Th("Metric"), Th("XGBoost"), Th("GCN"), Th("Winner"))),
                 Tbody(
-                    Tr(Td("PR-AUC"), Td("0.8234", style="color: var(--fg-green);"), Td("0.7891"), Td("XGBoost")),
-                    Tr(Td("Precision"), Td("0.891"), Td("0.856"), Td("XGBoost")),
-                    Tr(Td("Recall"), Td("0.734"), Td("0.789", style="color: var(--fg-green);"), Td("GCN")),
-                    Tr(Td("F1"), Td("0.805"), Td("0.821", style="color: var(--fg-green);"), Td("GCN")),
-                    Tr(Td("Inference"), Td("~2ms", style="color: var(--fg-green);"), Td("~50ms"), Td("XGBoost")),
+                    Tr(Td(Tip("PR-AUC")), Td("0.8234", style="color: var(--fg-green);"), Td("0.7891"), Td("XGBoost")),
+                    Tr(Td(Tip("Precision")), Td("0.891"), Td("0.856"), Td("XGBoost")),
+                    Tr(Td(Tip("Recall")), Td("0.734"), Td("0.789", style="color: var(--fg-green);"), Td("GCN")),
+                    Tr(Td(Tip("F1")), Td("0.805"), Td("0.821", style="color: var(--fg-green);"), Td("GCN")),
+                    Tr(Td(Tip("Inference")), Td("~2ms", style="color: var(--fg-green);"), Td("~50ms"), Td("XGBoost")),
                 ),
                 cls="spark-table",
             ),
             P("Note: Metrics shown are from the most recent training run. Train models to see live results.",
-              style="color: var(--fg-dim); font-size: 10px; margin-top: 8px;"),
+              style="color: var(--fg-subtle); font-size: 10px; margin-top: 8px;"),
         )
 
     @rt("/api/v1/illicit/threshold-analysis")
@@ -423,14 +464,14 @@ def register_api_routes(rt):
                     Table(
                         Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
                         Tbody(
-                            Tr(Td("Accuracy"), Td(f"{lr.get('accuracy', 0):.4f}"), Td(f"{xgb.get('accuracy', 0):.4f}", style="color: var(--fg-green);")),
-                            Tr(Td("F1 (macro)"), Td(f"{lr.get('f1_macro', 0):.4f}"), Td(f"{xgb.get('f1_macro', 0):.4f}", style="color: var(--fg-green);")),
-                            Tr(Td("Log Loss"), Td(f"{lr.get('log_loss', 0):.4f}"), Td(f"{xgb.get('log_loss', 0):.4f}", style="color: var(--fg-green);")),
+                            Tr(Td(Tip("Accuracy")), Td(f"{lr.get('accuracy', 0):.4f}"), Td(f"{xgb.get('accuracy', 0):.4f}", style="color: var(--fg-green);")),
+                            Tr(Td(Tip("F1 (macro)")), Td(f"{lr.get('f1_macro', 0):.4f}"), Td(f"{xgb.get('f1_macro', 0):.4f}", style="color: var(--fg-green);")),
+                            Tr(Td(Tip("Log Loss")), Td(f"{lr.get('log_loss', 0):.4f}"), Td(f"{xgb.get('log_loss', 0):.4f}", style="color: var(--fg-green);")),
                         ),
                         cls="spark-table",
                     ),
                     P("Metrics from most recent training run.",
-                      style="color: var(--fg-dim); font-size: 10px; margin-top: 8px;"),
+                      style="color: var(--fg-subtle); font-size: 10px; margin-top: 8px;"),
                 )
 
         # Hardcoded fallback
@@ -438,14 +479,14 @@ def register_api_routes(rt):
             Table(
                 Thead(Tr(Th("Metric"), Th("Logistic Regression"), Th("Calibrated XGBoost"))),
                 Tbody(
-                    Tr(Td("Accuracy"), Td("—"), Td("—")),
-                    Tr(Td("F1 (macro)"), Td("—"), Td("—")),
-                    Tr(Td("Log Loss"), Td("—"), Td("—")),
+                    Tr(Td(Tip("Accuracy")), Td("—"), Td("—")),
+                    Tr(Td(Tip("F1 (macro)")), Td("—"), Td("—")),
+                    Tr(Td(Tip("Log Loss")), Td("—"), Td("—")),
                 ),
                 cls="spark-table",
             ),
             P("No model card available. Run the onboarding training pipeline to see live metrics.",
-              style="color: var(--fg-dim); font-size: 10px; margin-top: 8px;"),
+              style="color: var(--fg-subtle); font-size: 10px; margin-top: 8px;"),
         )
 
     # === ALERTS ===

@@ -39,7 +39,7 @@ def alerts_page():
 
             Div(
                 P("Select an alert from the queue to view SHAP explanation and AI-generated compliance narrative.",
-                  style="color: var(--fg-dim);"),
+                  style="color: var(--fg-subtle);"),
                 id="alert-detail",
             ),
 

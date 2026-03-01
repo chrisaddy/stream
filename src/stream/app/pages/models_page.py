@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame,
+    Card, DataGrid, DataReadout, DiagnosticFrame, Tip,
 )
 from stream.app.models import get_all_model_cards
 
@@ -40,19 +40,19 @@ def _fmt(val, fmt=".4f"):
 def _metrics_table(metrics: dict, model_name: str):
     """Render a metrics table based on model type."""
     if not metrics:
-        return P("No metrics available. Run the training pipeline.", style="color: var(--fg-dim);")
+        return P("No metrics available. Run the training pipeline.", style="color: var(--fg-subtle);")
 
     if model_name == "illicit-xgboost":
         cost = metrics.get("cost_analysis", {})
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td("PR-AUC"), Td(_fmt(metrics.get("pr_auc")), style="color: var(--fg-green);")),
-                Tr(Td("Threshold"), Td(_fmt(cost.get("threshold"), ".3f"))),
-                Tr(Td("Precision"), Td(_fmt(cost.get("precision"), ".3f"))),
-                Tr(Td("Recall"), Td(_fmt(cost.get("recall"), ".3f"))),
-                Tr(Td("F1"), Td(_fmt(cost.get("f1"), ".3f"))),
-                Tr(Td("Total Cost"), Td(f"${cost.get('total_cost', 0):,.0f}")),
+                Tr(Td(Tip("PR-AUC")), Td(_fmt(metrics.get("pr_auc")), style="color: var(--fg-green);")),
+                Tr(Td(Tip("Threshold")), Td(_fmt(cost.get("threshold"), ".3f"))),
+                Tr(Td(Tip("Precision")), Td(_fmt(cost.get("precision"), ".3f"))),
+                Tr(Td(Tip("Recall")), Td(_fmt(cost.get("recall"), ".3f"))),
+                Tr(Td(Tip("F1")), Td(_fmt(cost.get("f1"), ".3f"))),
+                Tr(Td(Tip("Total Cost")), Td(f"${cost.get('total_cost', 0):,.0f}")),
             ),
             cls="spark-table",
         )
@@ -63,9 +63,9 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Logistic"), Th("XGBoost"))),
             Tbody(
-                Tr(Td("Accuracy"), Td(_fmt(lr.get("accuracy"))), Td(_fmt(xgb.get("accuracy")), style="color: var(--fg-green);")),
-                Tr(Td("F1 (macro)"), Td(_fmt(lr.get("f1_macro"))), Td(_fmt(xgb.get("f1_macro")), style="color: var(--fg-green);")),
-                Tr(Td("Log Loss"), Td(_fmt(lr.get("log_loss"))), Td(_fmt(xgb.get("log_loss")), style="color: var(--fg-green);")),
+                Tr(Td(Tip("Accuracy")), Td(_fmt(lr.get("accuracy"))), Td(_fmt(xgb.get("accuracy")), style="color: var(--fg-green);")),
+                Tr(Td(Tip("F1 (macro)")), Td(_fmt(lr.get("f1_macro"))), Td(_fmt(xgb.get("f1_macro")), style="color: var(--fg-green);")),
+                Tr(Td(Tip("Log Loss")), Td(_fmt(lr.get("log_loss"))), Td(_fmt(xgb.get("log_loss")), style="color: var(--fg-green);")),
             ),
             cls="spark-table",
         )
@@ -74,10 +74,10 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td("MAE"), Td(f"{_fmt(metrics.get('mae'))} sat/vB", style="color: var(--fg-green);")),
-                Tr(Td("RMSE"), Td(f"{_fmt(metrics.get('rmse'))} sat/vB")),
-                Tr(Td("MAPE"), Td(_fmt(metrics.get("mape")))),
-                Tr(Td("Median AE"), Td(f"{_fmt(metrics.get('median_ae'))} sat/vB")),
+                Tr(Td(Tip("MAE")), Td(f"{_fmt(metrics.get('mae'))} sat/vB", style="color: var(--fg-green);")),
+                Tr(Td(Tip("RMSE")), Td(f"{_fmt(metrics.get('rmse'))} sat/vB")),
+                Tr(Td(Tip("MAPE")), Td(_fmt(metrics.get("mape")))),
+                Tr(Td(Tip("Median AE")), Td(f"{_fmt(metrics.get('median_ae'))} sat/vB")),
             ),
             cls="spark-table",
         )
@@ -86,15 +86,15 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td("MAE"), Td(_fmt(metrics.get("mae"), ".2f"), style="color: var(--fg-green);")),
-                Tr(Td("R²"), Td(_fmt(metrics.get("r2")))),
-                Tr(Td("Median AE"), Td(_fmt(metrics.get("median_ae"), ".2f"))),
-                Tr(Td("Samples"), Td(str(metrics.get("n_samples", "—")))),
+                Tr(Td(Tip("MAE")), Td(_fmt(metrics.get("mae"), ".2f"), style="color: var(--fg-green);")),
+                Tr(Td(Tip("R²")), Td(_fmt(metrics.get("r2")))),
+                Tr(Td(Tip("Median AE")), Td(_fmt(metrics.get("median_ae"), ".2f"))),
+                Tr(Td(Tip("Samples")), Td(str(metrics.get("n_samples", "—")))),
             ),
             cls="spark-table",
         )
 
-    return P("Unknown model type", style="color: var(--fg-dim);")
+    return P("Unknown model type", style="color: var(--fg-subtle);")
 
 
 def _data_summary(data: dict):

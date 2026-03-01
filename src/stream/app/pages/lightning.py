@@ -54,7 +54,7 @@ def lightning_page():
             "NODE EVALUATOR",
 
             P("Enter a Lightning node public key to evaluate its routing potential.",
-              style="color: var(--fg-dim); margin-bottom: 12px;"),
+              style="color: var(--fg-subtle); margin-bottom: 12px;"),
 
             Form(
                 Div(

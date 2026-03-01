@@ -14,12 +14,10 @@ def home_page():
             # Oscilloscope canvas
             Canvas(id="oscilloscope", cls="oscilloscope"),
 
-            # Data readouts
-            DataGrid(
-                DataReadout("MEMPOOL_SIZE", "---", highlight=True),
-                DataReadout("TRANSACTIONS_SCORED", "0000"),
-                DataReadout("AVG_RISK_SCORE", "0.00"),
-                DataReadout("RECOMMENDED_FEE", "--- sat/vB"),
+            # Data readouts (live via HTMX)
+            Div(
+                id="home-stats",
+                **{"hx-get": "/api/v1/home/stats", "hx-trigger": "load, every 15s", "hx-swap": "innerHTML"},
             ),
 
             status="LIVE",

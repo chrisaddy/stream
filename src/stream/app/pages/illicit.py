@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, WalkthroughSection,
+    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, Tip, WalkthroughSection,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -21,11 +21,11 @@ def illicit_page():
                         Th("Metric"), Th("XGBoost"), Th("GCN"), Th("Winner"),
                     )),
                     Tbody(
-                        Tr(Td("PR-AUC"), Td(id="xgb-prauc"), Td(id="gcn-prauc"), Td(id="prauc-winner")),
-                        Tr(Td("Precision"), Td(id="xgb-prec"), Td(id="gcn-prec"), Td(id="prec-winner")),
-                        Tr(Td("Recall"), Td(id="xgb-rec"), Td(id="gcn-rec"), Td(id="rec-winner")),
-                        Tr(Td("F1"), Td(id="xgb-f1"), Td(id="gcn-f1"), Td(id="f1-winner")),
-                        Tr(Td("Inference (ms)"), Td("~2ms"), Td("~50ms"), Td("XGBoost")),
+                        Tr(Td(Tip("PR-AUC")), Td(id="xgb-prauc"), Td(id="gcn-prauc"), Td(id="prauc-winner")),
+                        Tr(Td(Tip("Precision")), Td(id="xgb-prec"), Td(id="gcn-prec"), Td(id="prec-winner")),
+                        Tr(Td(Tip("Recall")), Td(id="xgb-rec"), Td(id="gcn-rec"), Td(id="rec-winner")),
+                        Tr(Td(Tip("F1")), Td(id="xgb-f1"), Td(id="gcn-f1"), Td(id="f1-winner")),
+                        Tr(Td(Tip("Inference")), Td("~2ms"), Td("~50ms"), Td("XGBoost")),
                     ),
                     cls="spark-table",
                 ),
@@ -45,7 +45,7 @@ def illicit_page():
             "INTERACTIVE SCORING",
 
             P("Submit transaction features for real-time risk scoring with SHAP explanation.",
-              style="color: var(--fg-dim); margin-bottom: 16px;"),
+              style="color: var(--fg-subtle); margin-bottom: 16px;"),
 
             Form(
                 Div(
@@ -81,7 +81,7 @@ def illicit_page():
             "THRESHOLD ANALYSIS",
 
             P("Adjust the classification threshold to see the tradeoff between false positives (manual reviews) and false negatives (missed illicit transactions).",
-              style="color: var(--fg-dim); margin-bottom: 16px;"),
+              style="color: var(--fg-subtle); margin-bottom: 16px;"),
 
             Div(
                 Label("Classification Threshold", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase;"),
