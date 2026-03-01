@@ -22,7 +22,6 @@ from stream.app.pages.walkthrough import (
     walkthrough_fees,
     walkthrough_architecture,
     walkthrough_integration,
-    walkthrough_roadmap,
 )
 from stream.app.api import register_api_routes
 
@@ -134,11 +133,6 @@ def walkthrough_arch():
 @rt("/walkthrough/integration")
 def walkthrough_integ():
     return walkthrough_integration()
-
-
-@rt("/walkthrough/roadmap")
-def walkthrough_road():
-    return walkthrough_roadmap()
 
 
 # Run with: uvicorn stream.app.main:app --host 0.0.0.0 --port 5000

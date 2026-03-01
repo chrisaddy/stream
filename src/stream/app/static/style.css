@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 /* Main layout */
 .app-layout {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 180px 1fr;
     min-height: 100vh;
 }
 
@@ -47,7 +47,7 @@ a:hover { text-decoration: underline; }
 .nav-sidebar {
     background: var(--bg-surface);
     border-right: 1px solid var(--fg-dim);
-    padding: 20px 0;
+    padding: 16px 0;
     position: sticky;
     top: 0;
     height: 100vh;
@@ -56,13 +56,13 @@ a:hover { text-decoration: underline; }
 }
 
 .nav-brand {
-    padding: 0 12px 16px;
+    padding: 0 10px 12px;
     border-bottom: 1px solid var(--fg-dim);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .nav-brand h1 {
-    font-size: 14px;
+    font-size: 13px;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--fg-green);
@@ -71,32 +71,33 @@ a:hover { text-decoration: underline; }
 
 .nav-brand .badge {
     border: 1px solid var(--fg-dim);
-    padding: 2px 6px;
-    font-size: 9px;
+    padding: 2px 5px;
+    font-size: 8px;
     color: var(--fg-dim);
     letter-spacing: 1px;
 }
 
 .nav-section {
-    padding: 0 12px;
-    margin-bottom: 12px;
+    padding: 0 8px;
+    margin-bottom: 8px;
 }
 
 .nav-section-title {
-    font-size: 9px;
+    font-size: 8px;
     color: var(--fg-dim);
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    padding-left: 2px;
 }
 
 .nav-link {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 6px;
+    padding: 5px 8px;
     color: var(--fg-white);
-    font-size: 11px;
+    font-size: 10px;
     border-left: 2px solid transparent;
     transition: all 0.2s;
     white-space: nowrap;

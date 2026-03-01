@@ -180,7 +180,6 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Fee Deep Dive", "/walkthrough/fees", active=current_path == "/walkthrough/fees"),
             NavLink("Architecture", "/walkthrough/architecture", active=current_path == "/walkthrough/architecture"),
             NavLink("Integration", "/walkthrough/integration", active=current_path == "/walkthrough/integration"),
-            NavLink("ML Roadmap", "/walkthrough/roadmap", active=current_path == "/walkthrough/roadmap"),
             cls="nav-section",
         ),
         cls="nav-sidebar",
