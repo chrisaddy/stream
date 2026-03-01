@@ -1,79 +1,36 @@
-"""Pipeline visibility page — Live Prefect Cloud status."""
+"""System Status page — subsystem health + Prefect runs."""
 
 from fasthtml.common import *
 from stream.app.components import (
-    DiagnosticFrame, Page, StatusBadge,
+    DataGrid, DataReadout, DiagnosticFrame, Page,
 )
 
 
 def pipeline_page():
-    return Page("Pipeline", "/pipeline",
-        # DAG visualization
+    return Page("System Status", "/pipeline",
         DiagnosticFrame(
-            "TRAINING PIPELINE DAG",
+            "SYSTEM STATUS",
 
-            # Illicit pipeline
-            H4("Illicit Detection Pipeline", style="color: var(--fg-green); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
+            P("Live health of each STREAM subsystem. Pipeline DAGs and model freshness "
+              "are shown on each model's page (Illicit, Fees, Lightning, Onboarding).",
+              style="color: var(--fg-white); opacity: 0.85; margin-bottom: 12px;"),
+
             Div(
-                Span("LOAD_DATA", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TEMPORAL_SPLIT", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_XGBOOST", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("EVALUATE", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("SAVE_TO_R2", cls="flow-node active"),
-                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
+                id="system-status",
+                **{"hx-get": "/api/v1/system/status", "hx-trigger": "load, every 30s", "hx-swap": "innerHTML"},
             ),
 
-            # Fee pipeline
-            H4("Fee Estimation Pipeline", style="color: var(--fg-green); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
-            Div(
-                Span("COLLECT_MEMPOOL", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("FEATURIZE", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_LGBM", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("SAVE_TO_R2", cls="flow-node active"),
-                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
-            ),
-
-            # Lightning pipeline
-            H4("Lightning Analysis Pipeline", style="color: var(--fg-green); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
-            Div(
-                Span("FETCH_TOPOLOGY", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("BUILD_GRAPH", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("COMPUTE_FEATURES", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_MODEL", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("SAVE_TO_R2", cls="flow-node active"),
-                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
-            ),
-
-            # Onboarding pipeline
-            H4("Onboarding Risk Pipeline", style="color: var(--fg-green); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
-            Div(
-                Span("GENERATE_DATA", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_LOGISTIC", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_XGBOOST", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("EVALUATE", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("SAVE_TO_R2", cls="flow-node active"),
-                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
-            ),
-
-            # Feedback pipeline
-            H4("Feedback Retraining Pipeline", style="color: var(--fg-iris); font-size: 11px; letter-spacing: 1px; margin-bottom: 12px;"),
-            Div(
-                Span("LOAD_REVIEWS", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("JOIN_FEATURES", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("TRAIN_LGBM", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("EVALUATE", cls="flow-node active"), Span("->", cls="flow-arrow"),
-                Span("DEPLOY_LIVE", cls="flow-node active"),
-                style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap;",
-            ),
-
-            status="5 FLOWS",
-            footer_left="[PIP-001] PREFECT CLOUD",
-            footer_right="ORCHESTRATION",
+            status="LIVE",
+            footer_left="HEALTH CHECK",
+            footer_right="ALL SUBSYSTEMS",
         ),
 
-        # Recent runs
+        # Recent Prefect runs (cross-model)
         DiagnosticFrame(
             "RECENT FLOW RUNS",
+
+            P("Cross-model Prefect flow runs. Requires PREFECT_API_URL and PREFECT_API_KEY.",
+              style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
 
             Table(
                 Thead(Tr(
@@ -86,12 +43,12 @@ def pipeline_page():
                 cls="spark-table",
             ),
 
-            status="LIVE",
-            footer_left="[PIP-002] HISTORY",
+            status="PREFECT",
+            footer_left="FLOW HISTORY",
             footer_right="PREFECT_API",
         ),
 
-        # Model freshness
+        # All-models freshness overview
         DiagnosticFrame(
             "MODEL FRESHNESS",
 
@@ -100,8 +57,8 @@ def pipeline_page():
                 **{"hx-get": "/api/v1/pipeline/freshness", "hx-trigger": "load, every 60s", "hx-swap": "innerHTML"},
             ),
 
-            status="MONITORING",
-            footer_left="[PIP-003] DRIFT_WATCH",
-            footer_right="RETRAINING_SCHEDULE",
+            status="OVERVIEW",
+            footer_left="ALL MODELS",
+            footer_right="R2 + MEMORY",
         ),
     )

@@ -63,7 +63,7 @@ def test_models_page_removed(client):
 def test_pipeline_page(client):
     resp = client.get("/pipeline")
     assert resp.status_code == 200
-    assert "PIPELINE" in resp.text
+    assert "System Status" in resp.text or "SYSTEM STATUS" in resp.text
 
 
 def test_random_sample(client):

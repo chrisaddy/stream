@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, Page,
+    Card, DataGrid, DataReadout, DiagnosticFrame, Page, PipelineDag,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -105,4 +105,6 @@ def onboarding_page():
         ),
 
         render_model_card("onboarding-xgb"),
+
+        PipelineDag("onboarding-xgb"),
     )

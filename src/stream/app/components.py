@@ -205,6 +205,48 @@ def Tip(text: str, tip: str = ""):
     return Span(text, cls="tip", **{"data-tip": desc})
 
 
+_PIPELINE_DAGS = {
+    "illicit-xgboost": [
+        "LOAD_DATA", "TEMPORAL_SPLIT", "TRAIN_XGBOOST", "EVALUATE", "SAVE_TO_R2",
+    ],
+    "fee-lgbm": [
+        "COLLECT_MEMPOOL", "FEATURIZE", "TRAIN_LGBM", "SAVE_TO_R2",
+    ],
+    "lightning-lgbm": [
+        "FETCH_TOPOLOGY", "BUILD_GRAPH", "COMPUTE_FEATURES", "TRAIN_MODEL", "SAVE_TO_R2",
+    ],
+    "onboarding-xgb": [
+        "GENERATE_DATA", "TRAIN_LOGISTIC", "TRAIN_XGBOOST", "EVALUATE", "SAVE_TO_R2",
+    ],
+}
+
+
+def PipelineDag(model_name: str):
+    """Render the training pipeline DAG + freshness for a specific model."""
+    steps = _PIPELINE_DAGS.get(model_name, [])
+    dag_nodes = []
+    for i, step in enumerate(steps):
+        dag_nodes.append(Span(step, cls="flow-node active"))
+        if i < len(steps) - 1:
+            dag_nodes.append(Span("->", cls="flow-arrow"))
+
+    return DiagnosticFrame(
+        "TRAINING PIPELINE",
+
+        Div(*dag_nodes, style="overflow-x: auto; white-space: nowrap; margin-bottom: 16px;"),
+
+        Div(
+            id=f"freshness-{model_name}",
+            **{"hx-get": f"/api/v1/pipeline/freshness/{model_name}",
+               "hx-trigger": "load, every 60s", "hx-swap": "innerHTML"},
+        ),
+
+        status="PIPELINE",
+        footer_left=f"[{model_name.upper()}] PREFECT",
+        footer_right="ORCHESTRATION",
+    )
+
+
 def Card(title: str, *children):
     return Div(
         Div(title, cls="card-title"),
@@ -233,7 +275,7 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Fee Estimation", "/fees", active=current_path == "/fees"),
             NavLink("Lightning", "/lightning", active=current_path == "/lightning"),
             NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),
-            NavLink("Pipeline", "/pipeline", active=current_path == "/pipeline"),
+            NavLink("System Status", "/pipeline", active=current_path == "/pipeline"),
             cls="nav-section",
         ),
         Div(

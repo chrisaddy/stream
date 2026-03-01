@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, Tip,
+    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, PipelineDag, Tip,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -78,4 +78,6 @@ def fees_page():
         ),
 
         render_model_card("fee-lgbm"),
+
+        PipelineDag("fee-lgbm"),
     )

@@ -31,26 +31,26 @@ def register_api_routes(rt):
         return {"status": "ok", "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(), "models_loaded": bool(get_model("illicit-xgboost"))}
 
     @rt("/api/v1/system/status")
-    def system_status():
+    def system_status(request):
         from stream.config import settings
 
-        status = {}
+        subsystems = {}
 
         # DB connectivity
         try:
             db = SessionLocal()
             try:
                 db.execute("SELECT 1" if hasattr(db, "execute") else None)
-                status["db"] = "live"
+                subsystems["db"] = "live"
             finally:
                 db.close()
         except Exception:
-            status["db"] = "unavailable"
+            subsystems["db"] = "unavailable"
 
         # Models loaded
         model_names = ["illicit-xgboost", "fee-lgbm", "lightning-lgbm", "onboarding-xgb"]
         loaded = [n for n in model_names if get_model(n) is not None]
-        status["models"] = {"loaded": loaded, "total": len(model_names)}
+        subsystems["models"] = {"loaded": loaded, "total": len(model_names)}
 
         # R2
         try:
@@ -63,19 +63,48 @@ def register_api_routes(rt):
                     aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
                 )
                 s3.list_objects_v2(Bucket=settings.R2_BUCKET_NAME, MaxKeys=1)
-                status["r2"] = "live"
+                subsystems["r2"] = "live"
             else:
-                status["r2"] = "not configured"
+                subsystems["r2"] = "not configured"
         except Exception:
-            status["r2"] = "unavailable"
+            subsystems["r2"] = "unavailable"
 
         # Prefect
-        status["prefect"] = "configured" if settings.PREFECT_API_URL else "not configured"
+        subsystems["prefect"] = "configured" if settings.PREFECT_API_URL else "not configured"
 
         # Claude
-        status["claude"] = "configured" if settings.ANTHROPIC_API_KEY else "not configured"
+        subsystems["claude"] = "configured" if settings.ANTHROPIC_API_KEY else "not configured"
 
-        return status
+        # Return HTML for HTMX, JSON for API
+        if "text/html" in str(request.headers.get("accept", "")):
+            def _badge(val):
+                if val in ("live", "configured"):
+                    return StatusBadge(val.upper(), variant="green")
+                elif val == "not configured":
+                    return StatusBadge(val.upper(), variant="yellow")
+                else:
+                    return StatusBadge(val.upper(), variant="red")
+
+            models_info = subsystems["models"]
+            return DataGrid(
+                DataReadout("DATABASE", ""),
+                DataReadout("R2 STORAGE", ""),
+                DataReadout("PREFECT", ""),
+                DataReadout("CLAUDE API", ""),
+                DataReadout("MODELS", f"{len(models_info['loaded'])}/{models_info['total']}"),
+            ), Div(
+                _badge(subsystems["db"]),
+                Span(" DB  ", style="margin-right: 16px;"),
+                _badge(subsystems["r2"]),
+                Span(" R2  ", style="margin-right: 16px;"),
+                _badge(subsystems["prefect"]),
+                Span(" PREFECT  ", style="margin-right: 16px;"),
+                _badge(subsystems["claude"]),
+                Span(" CLAUDE", style="margin-right: 16px;"),
+                style="margin-top: 12px;",
+            )
+
+        return subsystems
 
     # === HOME STATS ===
 
@@ -1188,6 +1217,55 @@ def register_api_routes(rt):
                 for name, when, status in rows
             ]),
             cls="spark-table",
+        )
+
+    @rt("/api/v1/pipeline/freshness/{model_name}")
+    def model_freshness_single(model_name: str):
+        from stream.config import settings
+
+        when = "—"
+        status = "UNKNOWN"
+
+        # Try R2 head_object
+        if settings.R2_ENDPOINT_URL:
+            try:
+                import boto3
+                s3 = boto3.client(
+                    "s3",
+                    endpoint_url=settings.R2_ENDPOINT_URL,
+                    aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                )
+                resp = s3.head_object(
+                    Bucket=settings.R2_BUCKET_NAME,
+                    Key=f"models/{model_name}/latest.pkl",
+                )
+                last_modified = resp["LastModified"]
+                age = datetime.datetime.now(datetime.timezone.utc) - last_modified
+                if age.days > 0:
+                    when = f"{age.days}d ago"
+                elif age.seconds > 3600:
+                    when = f"{age.seconds // 3600}h ago"
+                else:
+                    when = f"{age.seconds // 60}m ago"
+                status = "FRESH" if age.days < 7 else "STALE"
+            except Exception:
+                pass
+
+        # Fallback: check if model loaded in memory
+        if status == "UNKNOWN":
+            loaded = get_model(model_name) is not None
+            status = "LOADED" if loaded else "NOT LOADED"
+
+        badge_cls = "badge-sm badge-green" if status in ("FRESH", "LOADED") else "badge-sm badge-yellow"
+        return Div(
+            DataGrid(
+                DataReadout("MODEL", model_name),
+                DataReadout("LAST MODIFIED", when),
+                DataReadout("STATUS", ""),
+            ),
+            Span(status, cls=badge_cls),
+            style="margin-top: 4px;",
         )
 
     # === FEEDBACK / RETRAINING ===

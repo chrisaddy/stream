@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, Page, Tip,
+    Card, DataGrid, DataReadout, DiagnosticFrame, Page, PipelineDag, Tip,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -96,4 +96,6 @@ def lightning_page():
         ),
 
         render_model_card("lightning-lgbm"),
+
+        PipelineDag("lightning-lgbm"),
     )

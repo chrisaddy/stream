@@ -2,7 +2,7 @@
 
 from fasthtml.common import *
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, Tip, WalkthroughSection,
+    Card, DataGrid, DataReadout, DiagnosticFrame, MetricItem, MetricsRow, Page, PipelineDag, Tip, WalkthroughSection,
 )
 from stream.app.pages.models_page import render_model_card
 
@@ -126,4 +126,6 @@ def illicit_page():
         ),
 
         render_model_card("illicit-xgboost"),
+
+        PipelineDag("illicit-xgboost"),
     )
