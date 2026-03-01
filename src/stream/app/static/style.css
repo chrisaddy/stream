@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 /* Main layout */
 .app-layout {
     display: grid;
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: auto 1fr;
     min-height: 100vh;
 }
 
@@ -52,11 +52,12 @@ a:hover { text-decoration: underline; }
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    overflow-x: hidden;
+    width: max-content;
+    min-width: 160px;
 }
 
 .nav-brand {
-    padding: 0 10px 12px;
+    padding: 0 12px 12px;
     border-bottom: 1px solid var(--fg-dim);
     margin-bottom: 8px;
 }
@@ -78,7 +79,7 @@ a:hover { text-decoration: underline; }
 }
 
 .nav-section {
-    padding: 0 8px;
+    padding: 0 10px;
     margin-bottom: 8px;
 }
 
@@ -97,12 +98,10 @@ a:hover { text-decoration: underline; }
     gap: 6px;
     padding: 5px 8px;
     color: var(--fg-white);
-    font-size: 10px;
+    font-size: 11px;
     border-left: 2px solid transparent;
     transition: all 0.2s;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .nav-link:hover {
