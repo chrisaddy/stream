@@ -114,7 +114,7 @@ def _heuristic_explanation(fee_rate: float, vsize: int, fee: int) -> list[dict]:
 
 
 def _try_river_model(fee_rate: float, vsize: int, fee: int) -> float | None:
-    """Attempt scoring with the River online model. Returns score or None."""
+    """Attempt scoring with the online model. Returns score or None."""
     try:
         from stream.feedback.pipeline import river_predict_one
         return river_predict_one(fee_rate, vsize, fee)
@@ -149,19 +149,19 @@ def _get_anomaly_score(fee_rate: float, vsize: int, fee: int) -> float:
 async def score_transaction(
     txid: str, vsize: int, fee: int
 ) -> dict:
-    """Score a live transaction — prefers River → learned model → heuristic.
+    """Score a live transaction — prefers online model → learned model → heuristic.
 
-    Scoring cascade: River online model first, then batch LightGBM, then heuristic.
+    Scoring cascade: online model first, then batch LightGBM, then heuristic.
     """
     start = time.time()
 
     fee_rate = fee / max(vsize, 1)
 
-    # Try River online model first
+    # Try online model first
     river_score = _try_river_model(fee_rate, vsize, fee)
     if river_score is not None:
         risk_score = round(river_score, 4)
-        model_name = "river-online"
+        model_name = "online-ml"
         model_version = "v3.0"
         shap_features = _heuristic_explanation(fee_rate, vsize, fee)
     else:

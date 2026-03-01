@@ -25,7 +25,7 @@ _retrain_status = {
 _learned_model = None
 _model_metadata = None
 
-# River online model state
+# Online model state
 _river_model = None
 _river_metrics = None
 _river_n_samples = 0
@@ -34,7 +34,7 @@ _river_n_negative = 0
 
 
 def _init_river_model():
-    """Create a River online learning pipeline: StandardScaler → LogisticRegression."""
+    """Create an online learning pipeline: StandardScaler → LogisticRegression."""
     from river.compose import Pipeline
     from river.linear_model import LogisticRegression
     from river.preprocessing import StandardScaler
@@ -68,7 +68,7 @@ def river_learn_one(fee_rate: float, vsize: float, fee: float, label: int):
     else:
         _river_n_negative += 1
 
-    log.info("River learn_one", n_samples=_river_n_samples, label=label,
+    log.info("Online learn_one", n_samples=_river_n_samples, label=label,
              n_pos=_river_n_positive, n_neg=_river_n_negative)
 
 
@@ -86,14 +86,14 @@ def river_predict_one(fee_rate: float, vsize: float, fee: float) -> float | None
 
 
 def get_river_model():
-    """Return the River model only if it has seen both classes."""
+    """Return the online model only if it has seen both classes."""
     if _river_model is None or _river_n_positive < 1 or _river_n_negative < 1:
         return None
     return _river_model
 
 
 def get_river_metrics() -> dict:
-    """Return River model status and metrics."""
+    """Return online model status and metrics."""
     is_ready = _river_n_positive >= 1 and _river_n_negative >= 1
     return {
         "n_samples": _river_n_samples,
@@ -105,7 +105,7 @@ def get_river_metrics() -> dict:
 
 
 def warm_up_river_model():
-    """Replay all existing ReviewRecords through River learn_one at startup."""
+    """Replay all existing ReviewRecords through online learn_one at startup."""
     from stream.models.alerts import AlertRecord
     from stream.models.reviews import ReviewRecord
 
@@ -116,7 +116,7 @@ def warm_up_river_model():
     try:
         reviews = db.query(ReviewRecord).order_by(ReviewRecord.reviewed_at).all()
         if not reviews:
-            log.info("River warm-up: no reviews to replay")
+            log.info("Online ML warm-up: no reviews to replay")
             return
 
         tx_ids = [r.tx_id for r in reviews]
@@ -136,9 +136,9 @@ def warm_up_river_model():
             river_learn_one(fee_rate, vsize, fee, label)
             replayed += 1
 
-        log.info("River warm-up complete", replayed=replayed, n_samples=_river_n_samples)
+        log.info("Online ML warm-up complete", replayed=replayed, n_samples=_river_n_samples)
     except Exception as e:
-        log.warning("River warm-up failed", error=str(e))
+        log.warning("Online ML warm-up failed", error=str(e))
     finally:
         db.close()
 

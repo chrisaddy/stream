@@ -1,4 +1,4 @@
-"""Unsupervised anomaly detection using River Half-Space Trees."""
+"""Unsupervised anomaly detection using Half-Space Trees."""
 
 import structlog
 

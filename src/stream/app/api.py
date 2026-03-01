@@ -899,18 +899,18 @@ def register_api_routes(rt):
                 "threshold_at_review": get_risk_threshold(),
             })
 
-            # === River Online Learning Integration ===
+            # === Online Learning Integration ===
             label = 1 if verdict == "true_positive" else 0
             fee_rate = raw_input.get("fee_rate", 0)
             vsize = raw_input.get("vsize", 0)
             fee = raw_input.get("fee", 0)
 
-            # 1. River learn_one (Feature 1)
+            # 1. Online learn_one
             try:
                 from stream.feedback.pipeline import river_learn_one
                 river_learn_one(fee_rate, vsize, fee, label)
             except Exception as e:
-                log.debug("River learn_one failed", error=str(e))
+                log.debug("Online learn_one failed", error=str(e))
 
             # 2. Online metrics (Feature 4)
             try:
@@ -1297,7 +1297,7 @@ def register_api_routes(rt):
             lineage += f" → lgbm-v2.0 ({meta['n_labels']} labels)"
         if river["n_samples"] > 0:
             river_status = "ACTIVE" if river["is_ready"] else "WARMING"
-            lineage += f" → river-v3.0 [{river_status}]"
+            lineage += f" → online-v3.0 [{river_status}]"
 
         status_color = {"IDLE": "var(--fg-dim)", "TRAINING": "var(--fg-orange)", "COMPLETE": "var(--fg-green)", "ERROR": "var(--fg-red)"}.get(status["state"], "var(--fg-dim)")
 

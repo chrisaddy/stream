@@ -187,7 +187,7 @@ def home_page():
                 ),
 
                 status="TRACKING",
-                footer_left="RIVER ONLINE ML",
+                footer_left="ONLINE ML",
                 footer_right="CUMULATIVE + ROLLING",
             ),
 
@@ -215,7 +215,7 @@ def home_page():
         DiagnosticFrame(
             "MODEL RACE",
 
-            P("3 River classifiers competing in real-time: LogisticRegression vs HoeffdingTree vs GaussianNB.",
+            P("3 online classifiers competing in real-time: LogisticRegression vs HoeffdingTree vs GaussianNB.",
               style="color: var(--fg-subtle); font-size: 11px; margin-bottom: 12px;"),
 
             Div(
@@ -239,7 +239,7 @@ def home_page():
             ),
 
             status="RACING",
-            footer_left="RIVER ONLINE ML",
+            footer_left="ONLINE ML",
             footer_right="ADAPTIVE_ENSEMBLE",
         ),
 

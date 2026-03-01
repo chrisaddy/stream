@@ -1,4 +1,4 @@
-"""River online metrics singleton — tracks cumulative and rolling classification metrics."""
+"""Online metrics singleton — tracks cumulative and rolling classification metrics."""
 
 from collections import deque
 
@@ -25,7 +25,7 @@ _initialized = False
 
 
 def _ensure_init():
-    """Lazy-initialize all River metrics."""
+    """Lazy-initialize all online metrics."""
     global _precision, _recall, _f1, _rocauc
     global _rolling_precision, _rolling_recall, _rolling_f1, _rolling_rocauc
     global _initialized

@@ -1,4 +1,4 @@
-"""Model race — 3 River classifiers competing in real-time."""
+"""Model race — 3 online classifiers competing in real-time."""
 
 from collections import deque
 from dataclasses import dataclass, field
