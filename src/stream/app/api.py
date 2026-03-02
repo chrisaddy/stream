@@ -22,6 +22,21 @@ from stream.services import score_transaction, get_risk_threshold, set_risk_thre
 
 log = structlog.get_logger()
 
+# Keep feature order stable for Lightning capacity model inference.
+# Duplicated here so UI endpoints can still run heuristic scoring when
+# lightgbm isn't installed in the runtime environment.
+LIGHTNING_FEATURE_COLS = [
+    "degree",
+    "channels",
+    "avg_neighbor_capacity",
+    "max_neighbor_capacity",
+    "capacity_per_channel",
+    "betweenness",
+    "closeness",
+    "avg_channel_capacity",
+    "total_edge_capacity",
+]
+
 
 def register_api_routes(rt):
     """Register all API routes."""
@@ -375,8 +390,6 @@ def register_api_routes(rt):
     @rt("/api/v1/lightning/top-nodes")
     async def top_nodes():
         try:
-            from stream.lightning.model import FEATURE_COLS
-
             model = get_model("lightning-lgbm")
             cached_features = get_cached_features("lightning")
 
@@ -404,7 +417,7 @@ def register_api_routes(rt):
                 if model is not None and pubkey in features_by_pubkey:
                     try:
                         feat = features_by_pubkey[pubkey]
-                        X = np.array([[feat.get(c, 0) for c in FEATURE_COLS]])
+                        X = np.array([[feat.get(c, 0) for c in LIGHTNING_FEATURE_COLS]])
                         pred = float(model.predict(X)[0])
                         # Normalize prediction to 0-1 score
                         score = min(pred / 10_000_000_000, 1.0)  # Normalize by 100 BTC in sats
@@ -433,7 +446,6 @@ def register_api_routes(rt):
 
     @rt("/api/v1/lightning/evaluate", methods=["POST"])
     async def evaluate_node(request):
-        from stream.lightning.model import FEATURE_COLS
         from stream.app.schemas import LightningEvaluateRequest
         from pydantic import ValidationError
 
@@ -467,7 +479,7 @@ def register_api_routes(rt):
                 feat = next((f for f in cached_features if f.get("pubkey") == pubkey), None)
                 if feat is not None:
                     try:
-                        X = np.array([[feat.get(c, 0) for c in FEATURE_COLS]])
+                        X = np.array([[feat.get(c, 0) for c in LIGHTNING_FEATURE_COLS]])
                         pred = float(model.predict(X)[0])
                         score = min(pred / 10_000_000_000, 1.0)
                         scoring_source = "ML-MODEL"
