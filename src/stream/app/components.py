@@ -301,6 +301,8 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Illicit Deep Dive", "/walkthrough/illicit", active=current_path == "/walkthrough/illicit"),
             NavLink("Fee Deep Dive", "/walkthrough/fees", active=current_path == "/walkthrough/fees"),
             NavLink("Architecture", "/walkthrough/architecture", active=current_path == "/walkthrough/architecture"),
+            NavLink("Online ML", "/walkthrough/online-ml", active=current_path == "/walkthrough/online-ml"),
+            NavLink("Compliance", "/walkthrough/compliance", active=current_path == "/walkthrough/compliance"),
             cls="nav-section",
         ),
         cls="nav-sidebar",

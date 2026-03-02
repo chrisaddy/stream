@@ -21,6 +21,8 @@ from stream.app.pages.walkthrough import (
     walkthrough_illicit,
     walkthrough_fees,
     walkthrough_architecture,
+    walkthrough_online_ml,
+    walkthrough_compliance,
 )
 from stream.app.api import register_api_routes
 
@@ -121,6 +123,16 @@ def walkthrough_fees_page():
 @rt("/walkthrough/architecture")
 def walkthrough_arch():
     return walkthrough_architecture()
+
+
+@rt("/walkthrough/online-ml")
+def walkthrough_online_ml_page():
+    return walkthrough_online_ml()
+
+
+@rt("/walkthrough/compliance")
+def walkthrough_compliance_page():
+    return walkthrough_compliance()
 
 
 # Run with: uvicorn stream.app.main:app --host 0.0.0.0 --port 5000
