@@ -6,6 +6,9 @@ from fasthtml.common import *
 
 _CSS_VERSION = int(_time.time())
 
+# Feature flag: hide onboarding page from sidebar navigation for now.
+_SHOW_ONBOARDING_NAV = False
+
 
 def NoiseOverlay():
     return Div(cls="noise-overlay")
@@ -292,7 +295,7 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Illicit Detection", "/illicit", active=current_path == "/illicit"),
             NavLink("Fee Estimation", "/fees", active=current_path == "/fees"),
             NavLink("Lightning", "/lightning", active=current_path == "/lightning"),
-            NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),
+            *((NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),) if _SHOW_ONBOARDING_NAV else ()),
             cls="nav-section",
         ),
         Div(
