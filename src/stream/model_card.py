@@ -91,6 +91,7 @@ def load_model_card_from_r2(name: str) -> dict | None:
 
 
 def _load_local_card(name: str) -> dict | None:
+    """Fallback: load model card from local filesystem."""
     import os
     path = f"models/{name}/card.json"
     if os.path.exists(path):

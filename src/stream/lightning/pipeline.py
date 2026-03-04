@@ -24,6 +24,7 @@ log = structlog.get_logger()
 
 @task(name="fetch-lightning-topology")
 async def fetch_topology():
+    """Fetch top Lightning nodes by connectivity from mempool.space."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         nodes = await get_top_nodes_connectivity(client, limit=200)
     if not nodes:
@@ -35,6 +36,7 @@ async def fetch_topology():
 
 @task(name="build-lightning-graph")
 def build_lightning_graph(nodes):
+    """Build a NetworkX graph from fetched node data."""
     G = build_graph(nodes)
     log.info("Graph built", nodes=G.number_of_nodes(), edges=G.number_of_edges())
     return G
@@ -42,6 +44,7 @@ def build_lightning_graph(nodes):
 
 @task(name="compute-lightning-features")
 def compute_features(G):
+    """Compute per-node graph features (degree, centrality, capacity)."""
     features = compute_all_features(G)
     log.info("Features computed", count=len(features))
     return features
@@ -67,6 +70,7 @@ def save_features(features: list[dict], name: str = "lightning-lgbm"):
 
 @task(name="train-lightning-model")
 def train_model(features):
+    """Train the LightGBM capacity prediction model."""
     model = train_capacity_model(features)
     log.info("Lightning model trained")
     return model
@@ -103,6 +107,7 @@ def evaluate_model(model, features):
 
 @task(name="save-lightning-model")
 def save_model(model, name: str = "lightning-lgbm"):
+    """Save lightning model to R2 with local fallback."""
     try:
         from io import BytesIO
         from prefect_aws.s3 import S3Bucket

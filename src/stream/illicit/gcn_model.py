@@ -19,6 +19,7 @@ class IllicitGCN(nn.Module):
     """3-layer GCN for binary classification (licit vs illicit)."""
 
     def __init__(self, in_channels: int = 165, hidden_channels: int = 128, dropout: float = 0.5):
+        """Initialise GCN layers with configurable width and dropout."""
         super().__init__()
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
@@ -26,6 +27,7 @@ class IllicitGCN(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
+        """Run a forward pass through all three GCN layers."""
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -134,12 +136,14 @@ def train_gcn(
 
 
 def serialize_gcn(model: IllicitGCN) -> bytes:
+    """Serialize GCN state dict to bytes for storage."""
     buf = BytesIO()
     torch.save(model.state_dict(), buf)
     return buf.getvalue()
 
 
 def deserialize_gcn(data: bytes, in_channels: int = 165) -> IllicitGCN:
+    """Deserialize GCN from bytes and set to eval mode."""
     buf = BytesIO(data)
     model = IllicitGCN(in_channels=in_channels)
     model.load_state_dict(torch.load(buf, weights_only=True))

@@ -12,6 +12,8 @@ _race = None
 
 @dataclass
 class RacingModel:
+    """State for a single model participating in the online race."""
+
     name: str
     model: object
     rolling_f1: object = None
@@ -23,7 +25,10 @@ class RacingModel:
 
 
 class ModelRace:
+    """Three online classifiers competing via test-then-train on live data."""
+
     def __init__(self):
+        """Initialise the three racing models with rolling metric trackers."""
         from river.compose import Pipeline
         from river.linear_model import LogisticRegression
         from river.naive_bayes import GaussianNB

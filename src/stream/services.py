@@ -32,6 +32,7 @@ def _load_threshold_from_db() -> float:
 
 
 def get_risk_threshold() -> float:
+    """Return the current risk threshold, loading from DB on first call."""
     global _risk_threshold
     if _risk_threshold is None:
         _risk_threshold = _load_threshold_from_db()
@@ -39,6 +40,7 @@ def get_risk_threshold() -> float:
 
 
 def set_risk_threshold(value: float):
+    """Update the risk threshold (clamped to 0.05–0.9) and persist to DB."""
     global _risk_threshold
     _risk_threshold = max(0.05, min(0.9, value))
     try:

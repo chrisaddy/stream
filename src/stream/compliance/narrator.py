@@ -24,6 +24,7 @@ def get_top_shap_features(
 
 
 def format_features_for_prompt(top_features: list[dict]) -> str:
+    """Format SHAP features as a bullet list for the LLM prompt."""
     lines = []
     for f in top_features:
         direction = "increases" if f["shap_value"] > 0 else "decreases"

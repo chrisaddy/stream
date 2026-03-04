@@ -33,6 +33,7 @@ Be concise and analytical. Focus on facts from the data, not speculation."""
 
 
 def get_investigation(tx_id: str) -> dict | None:
+    """Return a cached investigation result, or None if not found."""
     return _investigations.get(tx_id)
 
 

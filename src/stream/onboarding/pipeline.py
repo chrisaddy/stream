@@ -25,6 +25,7 @@ log = structlog.get_logger()
 
 @task(name="generate-kyc-data")
 def generate_data(n_samples: int = 10000):
+    """Generate synthetic KYC data, encode features, and split train/test."""
     df = generate_synthetic_kyc(n_samples)
     X, y = encode_features(df)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -34,6 +35,7 @@ def generate_data(n_samples: int = 10000):
 
 @task(name="train-logistic-baseline")
 def train_logistic(X_train, y_train):
+    """Train a logistic regression baseline with class balancing."""
     model, scaler = train_logistic_baseline(X_train, y_train)
     log.info("Logistic regression trained")
     return model, scaler
@@ -41,6 +43,7 @@ def train_logistic(X_train, y_train):
 
 @task(name="train-xgboost-onboarding")
 def train_xgboost(X_train, y_train):
+    """Train a Platt-calibrated XGBoost classifier."""
     model, scaler = train_calibrated_xgboost(X_train, y_train)
     log.info("Calibrated XGBoost trained")
     return model, scaler
@@ -48,6 +51,7 @@ def train_xgboost(X_train, y_train):
 
 @task(name="evaluate-onboarding-models")
 def evaluate_models(logistic, xgb, X_test, y_test, logistic_scaler, xgb_scaler):
+    """Evaluate both models and return metrics, calibration, and per-tier analysis."""
     import numpy as np
 
     X_test_lr = logistic_scaler.transform(X_test)
@@ -75,6 +79,7 @@ def evaluate_models(logistic, xgb, X_test, y_test, logistic_scaler, xgb_scaler):
 
 @task(name="save-onboarding-model")
 def save_model(model, scaler, name: str = "onboarding-xgb"):
+    """Save onboarding model and scaler to R2 with local fallback."""
     try:
         from io import BytesIO
         from prefect_aws.s3 import S3Bucket

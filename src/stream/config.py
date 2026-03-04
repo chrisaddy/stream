@@ -1,7 +1,18 @@
+"""Application configuration loaded from environment variables.
+
+Uses pydantic-settings to validate and type-cast env vars with sensible
+defaults for local development.
+"""
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Configuration settings for the Stream application.
+
+    Fields are populated from environment variables or a ``.env`` file.
+    """
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     # Database

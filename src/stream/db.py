@@ -1,3 +1,10 @@
+"""Database session management and async-safe write helpers.
+
+Provides a SQLAlchemy session factory and fire-and-forget DB write
+functions that run in background threads to avoid blocking the async
+event loop.
+"""
+
 import asyncio
 
 import structlog
@@ -13,6 +20,7 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
 def get_db():
+    """Yield a SQLAlchemy session and ensure it is closed after use."""
     db = SessionLocal()
     try:
         yield db

@@ -60,6 +60,7 @@ def train_multi_target_models(
 
 
 def serialize_fee_model(model: lgb.LGBMRegressor, feature_cols: list[str] | None = None) -> bytes:
+    """Serialize the fee model and optional feature column names to bytes."""
     buf = BytesIO()
     pickle.dump({"model": model, "feature_cols": feature_cols}, buf)
     return buf.getvalue()

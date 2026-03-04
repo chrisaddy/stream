@@ -55,11 +55,13 @@ def predict_capacity(model: lgb.LGBMRegressor, features: dict) -> float:
 
 
 def serialize_lightning_model(model: lgb.LGBMRegressor) -> bytes:
+    """Serialize the lightning capacity model to bytes."""
     buf = BytesIO()
     pickle.dump(model, buf)
     return buf.getvalue()
 
 
 def deserialize_lightning_model(data: bytes) -> lgb.LGBMRegressor:
+    """Deserialize the lightning capacity model from bytes."""
     buf = BytesIO(data)
     return pickle.load(buf)

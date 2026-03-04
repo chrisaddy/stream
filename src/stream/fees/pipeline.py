@@ -95,6 +95,7 @@ async def collect_data(n_snapshots: int = 100):
 
 @task(name="featurize-snapshots")
 def featurize(snapshots: list[dict]):
+    """Build feature matrix and target DataFrame from raw snapshots."""
     X = build_feature_matrix(snapshots)
     y = build_targets(snapshots)
     log.info("Features built", shape=X.shape)
@@ -103,6 +104,7 @@ def featurize(snapshots: list[dict]):
 
 @task(name="train-fee-model")
 def train_model(X, y):
+    """Train a LightGBM regressor on the 1-block confirmation target."""
     import numpy as np
 
     # Train for 1-block confirmation target
@@ -145,6 +147,7 @@ def evaluate_model(model, X_features, y_target, feature_cols):
 
 @task(name="save-fee-model")
 def save_model(model, feature_cols=None, name: str = "fee-lgbm"):
+    """Save fee model to R2 with local fallback."""
     if model is None:
         return
     try:
