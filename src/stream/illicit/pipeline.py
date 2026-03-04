@@ -29,6 +29,7 @@ log = structlog.get_logger()
 
 @task(name="load-elliptic-dataset")
 def load_dataset():
+    """Load the Elliptic Bitcoin dataset and return features, labels, timesteps."""
     log.info("Loading Elliptic Bitcoin dataset")
     features, labels, timesteps = load_pandas_dataset()
     log.info("Dataset loaded", n_samples=len(features), n_features=features.shape[1])
@@ -37,6 +38,7 @@ def load_dataset():
 
 @task(name="split-data")
 def split_data(features, labels, timesteps):
+    """Apply temporal train/test split, filtering unknown labels."""
     X_train, y_train, X_test, y_test = temporal_split(features, labels, timesteps)
     log.info(
         "Temporal split complete",
@@ -50,6 +52,7 @@ def split_data(features, labels, timesteps):
 
 @task(name="train-xgboost-model")
 def train_model(X_train, y_train, X_test, y_test):
+    """Train XGBoost with class-weighted loss and early stopping."""
     scale_pos_weight = get_class_weight(y_train)
     log.info("Training XGBoost", scale_pos_weight=f"{scale_pos_weight:.1f}")
 
@@ -63,6 +66,7 @@ def train_model(X_train, y_train, X_test, y_test):
 
 @task(name="evaluate-model")
 def evaluate_model(model, X_test, y_test, timesteps, labels):
+    """Evaluate model on the test set and return full metrics dict."""
     y_prob = model.predict_proba(X_test)[:, 1]
 
     # Get test timesteps
@@ -103,6 +107,7 @@ def save_model_to_r2(model, name: str = "illicit-xgboost"):
 
 @task(name="create-metrics-artifact")
 def create_artifact(metrics: dict):
+    """Create a Prefect markdown artifact summarising evaluation metrics."""
     markdown = f"""# Illicit Detection — XGBoost Results
 
 ## Overall Metrics

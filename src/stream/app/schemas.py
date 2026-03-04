@@ -6,6 +6,8 @@ from pydantic import BaseModel, field_validator
 
 
 class IllicitScoreRequest(BaseModel):
+    """Request body for the 166-feature illicit scoring endpoint."""
+
     features: str
 
     @field_validator("features")
@@ -23,6 +25,8 @@ class IllicitScoreRequest(BaseModel):
 
 
 class LiveScoreRequest(BaseModel):
+    """Request body for live transaction scoring (vsize + fee only)."""
+
     vsize: int
     fee: int
 
@@ -42,6 +46,8 @@ class LiveScoreRequest(BaseModel):
 
 
 class LightningEvaluateRequest(BaseModel):
+    """Request body for Lightning node evaluation by public key."""
+
     pubkey: str
 
     @field_validator("pubkey")
@@ -56,6 +62,8 @@ class LightningEvaluateRequest(BaseModel):
 
 
 class ThresholdRequest(BaseModel):
+    """Request body for updating the global risk threshold."""
+
     value: float
 
     @field_validator("value")

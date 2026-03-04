@@ -144,6 +144,7 @@ def warm_up_river_model():
 
 
 def get_retrain_status() -> dict:
+    """Return a copy of the current retraining status dict."""
     return dict(_retrain_status)
 
 
@@ -153,6 +154,7 @@ def get_learned_model():
 
 
 def get_model_metadata() -> dict | None:
+    """Return metadata for the most recently trained model, or None."""
     return _model_metadata
 
 

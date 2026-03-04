@@ -65,12 +65,14 @@ def train_calibrated_xgboost(
 
 
 def serialize_onboarding_model(model, scaler) -> bytes:
+    """Serialize the onboarding model and its scaler to bytes."""
     buf = BytesIO()
     pickle.dump({"model": model, "scaler": scaler}, buf)
     return buf.getvalue()
 
 
 def deserialize_onboarding_model(data: bytes):
+    """Deserialize onboarding model and scaler from bytes."""
     buf = BytesIO(data)
     d = pickle.load(buf)
     return d["model"], d["scaler"]

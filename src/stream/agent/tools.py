@@ -92,6 +92,7 @@ async def execute_tool(name: str, args: dict) -> str:
 
 
 def _get_alert_details(tx_id: str) -> str:
+    """Look up a full alert record by transaction ID."""
     from stream.models.alerts import AlertRecord
     db = SessionLocal()
     try:
@@ -114,6 +115,7 @@ def _get_alert_details(tx_id: str) -> str:
 
 
 async def _lookup_onchain(tx_id: str) -> str:
+    """Fetch on-chain transaction data from mempool.space."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"https://mempool.space/api/tx/{tx_id}")
@@ -149,6 +151,7 @@ async def _lookup_onchain(tx_id: str) -> str:
 
 
 def _query_predictions(min_score: float, limit: int) -> str:
+    """Query recent predictions above a minimum risk score."""
     from stream.models.predictions import PredictionRecord
     db = SessionLocal()
     try:
@@ -170,6 +173,7 @@ def _query_predictions(min_score: float, limit: int) -> str:
 
 
 def _get_reviews(limit: int) -> str:
+    """Retrieve recent analyst review verdicts (TP/FP counts)."""
     from stream.models.reviews import ReviewRecord
     db = SessionLocal()
     try:
@@ -190,6 +194,7 @@ def _get_reviews(limit: int) -> str:
 
 
 def _check_similar(tx_id: str, tolerance: float) -> str:
+    """Find alerts with similar fee_rate/vsize profiles within tolerance."""
     from stream.models.alerts import AlertRecord
     db = SessionLocal()
     try:

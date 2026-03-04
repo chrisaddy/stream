@@ -10,6 +10,7 @@ MEMPOOL_BASE = "https://mempool.space/api"
 
 
 async def get_network_stats(client: httpx.AsyncClient) -> dict | None:
+    """Fetch latest Lightning network statistics from mempool.space."""
     try:
         resp = await client.get(f"{MEMPOOL_BASE}/v1/lightning/statistics/latest")
         resp.raise_for_status()
@@ -20,6 +21,7 @@ async def get_network_stats(client: httpx.AsyncClient) -> dict | None:
 
 
 async def get_top_nodes_connectivity(client: httpx.AsyncClient, limit: int = 100) -> list | None:
+    """Fetch top nodes ranked by connectivity (channel count)."""
     try:
         resp = await client.get(f"{MEMPOOL_BASE}/v1/lightning/nodes/rankings/connectivity")
         resp.raise_for_status()
@@ -30,6 +32,7 @@ async def get_top_nodes_connectivity(client: httpx.AsyncClient, limit: int = 100
 
 
 async def get_top_nodes_liquidity(client: httpx.AsyncClient, limit: int = 100) -> list | None:
+    """Fetch top nodes ranked by total liquidity."""
     try:
         resp = await client.get(f"{MEMPOOL_BASE}/v1/lightning/nodes/rankings/liquidity")
         resp.raise_for_status()
@@ -40,6 +43,7 @@ async def get_top_nodes_liquidity(client: httpx.AsyncClient, limit: int = 100) -
 
 
 async def get_node_details(client: httpx.AsyncClient, pubkey: str) -> dict | None:
+    """Fetch detailed information for a specific node by public key."""
     try:
         resp = await client.get(f"{MEMPOOL_BASE}/v1/lightning/nodes/{pubkey}")
         resp.raise_for_status()
@@ -50,6 +54,7 @@ async def get_node_details(client: httpx.AsyncClient, pubkey: str) -> dict | Non
 
 
 async def get_node_channels(client: httpx.AsyncClient, pubkey: str) -> list | None:
+    """Fetch all channels for a specific Lightning node."""
     try:
         resp = await client.get(f"{MEMPOOL_BASE}/v1/lightning/channels?public_key={pubkey}")
         resp.raise_for_status()
