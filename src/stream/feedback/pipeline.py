@@ -42,6 +42,7 @@ def _init_river_model():
     global _river_model, _river_metrics
     _river_model = Pipeline(StandardScaler(), LogisticRegression(l2=0.01))
     from river.metrics import Accuracy
+
     _river_metrics = Accuracy()
 
 
@@ -68,8 +69,13 @@ def river_learn_one(fee_rate: float, vsize: float, fee: float, label: int):
     else:
         _river_n_negative += 1
 
-    log.info("Online learn_one", n_samples=_river_n_samples, label=label,
-             n_pos=_river_n_positive, n_neg=_river_n_negative)
+    log.info(
+        "Online learn_one",
+        n_samples=_river_n_samples,
+        label=label,
+        n_pos=_river_n_positive,
+        n_neg=_river_n_negative,
+    )
 
 
 def river_predict_one(fee_rate: float, vsize: float, fee: float) -> float | None:
@@ -215,13 +221,17 @@ def run_retraining() -> dict:
 
         if len(X) < 3:
             _retrain_status["state"] = "ERROR"
-            _retrain_status["error"] = f"Need at least 3 labeled alerts with raw features, got {len(X)}"
+            _retrain_status["error"] = (
+                f"Need at least 3 labeled alerts with raw features, got {len(X)}"
+            )
             return _retrain_status
 
         # Check we have both classes
         if len(np.unique(y)) < 2:
             _retrain_status["state"] = "ERROR"
-            _retrain_status["error"] = "Need both TP and FP labels to train. Review more alerts with diverse verdicts."
+            _retrain_status["error"] = (
+                "Need both TP and FP labels to train. Review more alerts with diverse verdicts."
+            )
             return _retrain_status
 
         result = train_live_heuristic(X, y)
@@ -245,7 +255,12 @@ def run_retraining() -> dict:
             "n_test": result["n_test"],
         }
 
-        log.info("Retraining complete", accuracy=result["accuracy"], method=result["method"], n_labels=n_labels)
+        log.info(
+            "Retraining complete",
+            accuracy=result["accuracy"],
+            method=result["method"],
+            n_labels=n_labels,
+        )
 
         # Try to save to R2 (best-effort)
         try:
@@ -272,22 +287,30 @@ def _save_model_to_r2(model, metadata: dict):
     os.makedirs("models/live-heuristic-v2", exist_ok=True)
     with open("models/live-heuristic-v2/latest.pkl", "wb") as f:
         f.write(model_bytes)
-    log.info("Model saved locally", path="models/live-heuristic-v2/latest.pkl", size_bytes=len(model_bytes))
+    log.info(
+        "Model saved locally",
+        path="models/live-heuristic-v2/latest.pkl",
+        size_bytes=len(model_bytes),
+    )
 
     # Try R2
     try:
         from io import BytesIO
+
         from stream.config import settings
 
         if settings.R2_ENDPOINT_URL:
             import boto3
+
             s3 = boto3.client(
                 "s3",
                 endpoint_url=settings.R2_ENDPOINT_URL,
                 aws_access_key_id=settings.R2_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
             )
-            s3.upload_fileobj(BytesIO(model_bytes), settings.R2_BUCKET_NAME, "models/live-heuristic-v2/latest.pkl")
+            s3.upload_fileobj(
+                BytesIO(model_bytes), settings.R2_BUCKET_NAME, "models/live-heuristic-v2/latest.pkl"
+            )
             log.info("Model uploaded to R2")
     except Exception as e:
         log.debug("R2 upload skipped", error=str(e))

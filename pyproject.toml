@@ -45,6 +45,9 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/stream/app/**/*.py" = ["F403", "F405", "E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

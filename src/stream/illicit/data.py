@@ -4,11 +4,9 @@ Uses PyTorch Geometric's built-in EllipticBitcoinDataset loader
 and also provides a pandas-based loader for XGBoost.
 """
 
-import numpy as np
 import pandas as pd
 import torch
 from torch_geometric.datasets import EllipticBitcoinDataset
-
 
 DATA_DIR = "./data/elliptic"
 
@@ -37,7 +35,7 @@ def load_pandas_dataset(root: str = DATA_DIR) -> tuple[pd.DataFrame, pd.Series, 
     # Remap to: 0=licit, 1=illicit, 2=unknown
     raw_labels = data.y.numpy()
     label_map = {0: 2, 1: 0, 2: 1}  # unknown->2, licit->0, illicit->1
-    labels = pd.Series([label_map.get(l, 2) for l in raw_labels])
+    labels = pd.Series([label_map.get(label, 2) for label in raw_labels])
 
     # Timestep is the first feature (feature_0)
     timesteps = features["feature_0"].astype(int)

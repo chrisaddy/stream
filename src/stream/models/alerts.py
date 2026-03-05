@@ -21,5 +21,7 @@ class AlertRecord(Base):
     model_name: Mapped[str] = mapped_column(String(100))
     explanation: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     narrative: Mapped[str | None] = mapped_column(Text, nullable=True)
-    raw_input: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {"vsize": int, "fee": int, "fee_rate": float}
+    raw_input: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True
+    )  # {"vsize": int, "fee": int, "fee_rate": float}
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/reviewed/escalated

@@ -6,7 +6,6 @@ Sends email on every flow run completion (success or failure).
 from prefect.automations import Automation, EventTrigger, Posture
 from prefect.events.actions import SendNotification
 
-
 EMAIL = "chris.william.addy@gmail.com"
 
 
@@ -90,7 +89,7 @@ if __name__ == "__main__":
     print()
     print("Alternatively, configure automations directly in the Prefect Cloud UI:")
     print("  https://app.prefect.cloud -> Automations -> Create")
-    print(f"  Trigger: Flow run state change (Completed, Failed, Crashed)")
+    print("  Trigger: Flow run state change (Completed, Failed, Crashed)")
     print(f"  Action: Send notification to {EMAIL}")
     print()
 

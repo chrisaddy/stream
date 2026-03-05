@@ -12,11 +12,10 @@ an in-process server to execute scheduled runs.
 from prefect import serve
 
 from stream.data.pipeline import collect_data_pipeline
-from stream.illicit.pipeline import train_illicit_pipeline
 from stream.fees.pipeline import train_fees_pipeline
+from stream.illicit.pipeline import train_illicit_pipeline
 from stream.lightning.pipeline import train_lightning_pipeline
 from stream.onboarding.pipeline import train_onboarding_pipeline
-
 
 CRON_EVERY_1H = "0 * * * *"
 CRON_EVERY_6H = "0 */6 * * *"

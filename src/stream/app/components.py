@@ -27,7 +27,9 @@ def ScanLine():
     return Div(cls="scan-line")
 
 
-def DiagnosticFrame(title: str, *children, status: str = "ACTIVE", footer_left: str = "", footer_right: str = ""):
+def DiagnosticFrame(
+    title: str, *children, status: str = "ACTIVE", footer_left: str = "", footer_right: str = ""
+):
     return Div(
         Div(
             Span(title),
@@ -105,7 +107,9 @@ def FeedRow(timestamp, tx_id, size, fee_rate, risk_score, risk_label, threshold=
         Div(tx_id, style="font-weight: bold;"),
         Div(f"{size} vB"),
         Div(f"{fee_rate:.1f} sat/vB"),
-        Div(Span(f"{risk_score:.2f}"), Span(" "), badge, cls=risk_cls) if badge else Div(f"{risk_score:.2f}", cls=risk_cls),
+        Div(Span(f"{risk_score:.2f}"), Span(" "), badge, cls=risk_cls)
+        if badge
+        else Div(f"{risk_score:.2f}", cls=risk_cls),
         Div(risk_label),
         cls=row_cls,
     )
@@ -210,16 +214,31 @@ def Tip(text: str, tip: str = ""):
 
 _PIPELINE_DAGS = {
     "illicit-xgboost": [
-        "LOAD_DATA", "TEMPORAL_SPLIT", "TRAIN_XGBOOST", "EVALUATE", "SAVE_TO_R2",
+        "LOAD_DATA",
+        "TEMPORAL_SPLIT",
+        "TRAIN_XGBOOST",
+        "EVALUATE",
+        "SAVE_TO_R2",
     ],
     "fee-lgbm": [
-        "COLLECT_MEMPOOL", "FEATURIZE", "TRAIN_LGBM", "SAVE_TO_R2",
+        "COLLECT_MEMPOOL",
+        "FEATURIZE",
+        "TRAIN_LGBM",
+        "SAVE_TO_R2",
     ],
     "lightning-lgbm": [
-        "FETCH_TOPOLOGY", "BUILD_GRAPH", "COMPUTE_FEATURES", "TRAIN_MODEL", "SAVE_TO_R2",
+        "FETCH_TOPOLOGY",
+        "BUILD_GRAPH",
+        "COMPUTE_FEATURES",
+        "TRAIN_MODEL",
+        "SAVE_TO_R2",
     ],
     "onboarding-xgb": [
-        "GENERATE_DATA", "TRAIN_LOGISTIC", "TRAIN_XGBOOST", "EVALUATE", "SAVE_TO_R2",
+        "GENERATE_DATA",
+        "TRAIN_LOGISTIC",
+        "TRAIN_XGBOOST",
+        "EVALUATE",
+        "SAVE_TO_R2",
     ],
 }
 
@@ -235,15 +254,15 @@ def PipelineDag(model_name: str):
 
     return DiagnosticFrame(
         "TRAINING PIPELINE",
-
         Div(*dag_nodes, style="overflow-x: auto; white-space: nowrap; margin-bottom: 16px;"),
-
         Div(
             id=f"freshness-{model_name}",
-            **{"hx-get": f"/api/v1/pipeline/freshness/{model_name}",
-               "hx-trigger": "load, every 60s", "hx-swap": "innerHTML"},
+            **{
+                "hx-get": f"/api/v1/pipeline/freshness/{model_name}",
+                "hx-trigger": "load, every 60s",
+                "hx-swap": "innerHTML",
+            },
         ),
-
         status="PIPELINE",
         footer_left=f"[{model_name.upper()}] PREFECT",
         footer_right="ORCHESTRATION",
@@ -295,17 +314,39 @@ def NavSidebar(current_path: str = "/"):
             NavLink("Illicit Detection", "/illicit", active=current_path == "/illicit"),
             NavLink("Fee Estimation", "/fees", active=current_path == "/fees"),
             NavLink("Lightning", "/lightning", active=current_path == "/lightning"),
-            *((NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),) if _SHOW_ONBOARDING_NAV else ()),
+            *(
+                (NavLink("Onboarding", "/onboarding", active=current_path == "/onboarding"),)
+                if _SHOW_ONBOARDING_NAV
+                else ()
+            ),
             cls="nav-section",
         ),
         Div(
             Div("WALKTHROUGH", cls="nav-section-title"),
             NavLink("Overview", "/walkthrough", active=current_path == "/walkthrough"),
-            NavLink("Illicit Deep Dive", "/walkthrough/illicit", active=current_path == "/walkthrough/illicit"),
-            NavLink("Fee Deep Dive", "/walkthrough/fees", active=current_path == "/walkthrough/fees"),
-            NavLink("Architecture", "/walkthrough/architecture", active=current_path == "/walkthrough/architecture"),
-            NavLink("Online ML", "/walkthrough/online-ml", active=current_path == "/walkthrough/online-ml"),
-            NavLink("Compliance", "/walkthrough/compliance", active=current_path == "/walkthrough/compliance"),
+            NavLink(
+                "Illicit Deep Dive",
+                "/walkthrough/illicit",
+                active=current_path == "/walkthrough/illicit",
+            ),
+            NavLink(
+                "Fee Deep Dive", "/walkthrough/fees", active=current_path == "/walkthrough/fees"
+            ),
+            NavLink(
+                "Architecture",
+                "/walkthrough/architecture",
+                active=current_path == "/walkthrough/architecture",
+            ),
+            NavLink(
+                "Online ML",
+                "/walkthrough/online-ml",
+                active=current_path == "/walkthrough/online-ml",
+            ),
+            NavLink(
+                "Compliance",
+                "/walkthrough/compliance",
+                active=current_path == "/walkthrough/compliance",
+            ),
             cls="nav-section",
         ),
         cls="nav-sidebar",

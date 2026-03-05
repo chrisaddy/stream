@@ -39,6 +39,7 @@ def _adwin_update(score: float):
 
     if _adwin is None:
         from river.drift import ADWIN
+
         _adwin = ADWIN(delta=0.002)
 
     _adwin.update(score)
@@ -47,10 +48,12 @@ def _adwin_update(score: float):
     if _adwin.drift_detected:
         _adwin_drift_detected = True
         _adwin_last_drift_at = _time.time()
-        _adwin_drift_history.append({
-            "sample": _adwin_n_samples,
-            "timestamp": _adwin_last_drift_at,
-        })
+        _adwin_drift_history.append(
+            {
+                "sample": _adwin_n_samples,
+                "timestamp": _adwin_last_drift_at,
+            }
+        )
         log.warning("ADWIN drift detected", sample=_adwin_n_samples)
     else:
         _adwin_drift_detected = False
@@ -141,6 +144,7 @@ def reset_adwin():
     """Re-initialize ADWIN (called after adaptation)."""
     global _adwin, _adwin_drift_detected, _adwin_n_samples, _adwin_last_drift_at
     from river.drift import ADWIN
+
     _adwin = ADWIN(delta=0.002)
     _adwin_drift_detected = False
     _adwin_n_samples = 0
@@ -200,7 +204,9 @@ def get_distribution() -> dict:
     if len(_score_buffer) < 10:
         return {"bins": [], "current": [], "baseline": []}
 
-    bin_centers = [round(float((_BIN_EDGES[i] + _BIN_EDGES[i + 1]) / 2), 2) for i in range(len(_BIN_EDGES) - 1)]
+    bin_centers = [
+        round(float((_BIN_EDGES[i] + _BIN_EDGES[i + 1]) / 2), 2) for i in range(len(_BIN_EDGES) - 1)
+    ]
 
     current_scores = np.array(list(_score_buffer))
     current_hist, _ = np.histogram(current_scores, bins=_BIN_EDGES)

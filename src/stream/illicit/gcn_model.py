@@ -5,7 +5,6 @@ GCN learns from both node features AND graph structure, unlike XGBoost which
 only sees individual transaction features.
 """
 
-import pickle
 from io import BytesIO
 
 import numpy as np
@@ -111,6 +110,7 @@ def train_gcn(
             val_labels = y[val_mask].cpu().numpy()
 
         from sklearn.metrics import average_precision_score
+
         val_prauc = average_precision_score(val_labels, val_probs) if val_labels.sum() > 0 else 0.0
 
         history["train_loss"].append(float(loss))

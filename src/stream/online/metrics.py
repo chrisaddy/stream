@@ -33,7 +33,7 @@ def _ensure_init():
     if _initialized:
         return
 
-    from river.metrics import Precision, Recall, F1, ROCAUC
+    from river.metrics import F1, ROCAUC, Precision, Recall
     from river.utils import Rolling
 
     _precision = Precision()

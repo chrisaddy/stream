@@ -72,12 +72,14 @@ def explain_prediction(
 
     contributions = []
     for idx in top_indices:
-        contributions.append({
-            "feature": feature_names[idx],
-            "feature_index": int(idx),
-            "shap_value": float(shap_values[0][idx]),
-            "feature_value": float(features[0][idx]),
-        })
+        contributions.append(
+            {
+                "feature": feature_names[idx],
+                "feature_index": int(idx),
+                "shap_value": float(shap_values[0][idx]),
+                "feature_value": float(features[0][idx]),
+            }
+        )
 
     return {
         "base_value": float(explainer.expected_value),
@@ -103,7 +105,10 @@ def get_global_feature_importance(
         feature_names = [f"feature_{i}" for i in range(X.shape[1])]
 
     importance = sorted(
-        [{"feature": name, "importance": float(val)} for name, val in zip(feature_names, mean_abs_shap)],
+        [
+            {"feature": name, "importance": float(val)}
+            for name, val in zip(feature_names, mean_abs_shap)
+        ],
         key=lambda x: x["importance"],
         reverse=True,
     )

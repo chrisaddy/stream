@@ -17,10 +17,7 @@ def get_top_shap_features(
     """Get top-k features by absolute SHAP value."""
     pairs = list(zip(feature_names, shap_values))
     pairs.sort(key=lambda x: abs(x[1]), reverse=True)
-    return [
-        {"feature": name, "shap_value": round(val, 4)}
-        for name, val in pairs[:top_k]
-    ]
+    return [{"feature": name, "shap_value": round(val, 4)} for name, val in pairs[:top_k]]
 
 
 def format_features_for_prompt(top_features: list[dict]) -> str:
@@ -52,16 +49,23 @@ async def generate_compliance_narrative(
         response = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=300,
-            messages=[{
-                "role": "user",
-                "content": f"""Generate a concise compliance analyst narrative for this flagged Bitcoin transaction.
-
-Risk score: {risk_score:.2f}
-Top contributing features:
-{feature_text}
-
-Write 2-3 sentences suitable for a SAR filing. Be specific about which patterns triggered the flag. Use financial compliance terminology."""
-            }]
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Generate a concise compliance analyst "
+                        "narrative for this flagged Bitcoin "
+                        "transaction.\n\n"
+                        f"Risk score: {risk_score:.2f}\n"
+                        "Top contributing features:\n"
+                        f"{feature_text}\n\n"
+                        "Write 2-3 sentences suitable for a SAR "
+                        "filing. Be specific about which patterns "
+                        "triggered the flag. Use financial "
+                        "compliance terminology."
+                    ),
+                }
+            ],
         )
         return response.content[0].text
 

@@ -6,7 +6,6 @@ import pytest
 
 from stream.illicit.preprocess import (
     get_class_weight,
-    get_temporal_groups,
     temporal_split,
 )
 

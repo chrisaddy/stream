@@ -100,4 +100,9 @@ def test_pipeline_freshness(client):
     resp = client.get("/api/v1/pipeline/freshness")
     assert resp.status_code == 200
     # Freshness now shows real R2 data or honest load status
-    assert "Model" in resp.text or "LOADED" in resp.text or "NOT LOADED" in resp.text or "FRESH" in resp.text
+    assert (
+        "Model" in resp.text
+        or "LOADED" in resp.text
+        or "NOT LOADED" in resp.text
+        or "FRESH" in resp.text
+    )

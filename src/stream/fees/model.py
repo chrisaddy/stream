@@ -40,7 +40,8 @@ def train_fee_model(
     train_idx, val_idx = splits[-1]
 
     model.fit(
-        X[train_idx], y[train_idx],
+        X[train_idx],
+        y[train_idx],
         eval_set=[(X[val_idx], y[val_idx])],
         callbacks=[lgb.early_stopping(20, verbose=False)],
     )

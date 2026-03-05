@@ -16,7 +16,10 @@ def train_live_heuristic(X: np.ndarray, y: np.ndarray) -> dict:
         import lightgbm as lgb
         from sklearn.model_selection import cross_val_score, train_test_split
     except ImportError:
-        log.error("lightgbm or scikit-learn not installed — install with: pip install lightgbm scikit-learn")
+        log.error(
+            "lightgbm or scikit-learn not installed"
+            " — install with: pip install lightgbm scikit-learn"
+        )
         raise
 
     params = {
@@ -31,7 +34,9 @@ def train_live_heuristic(X: np.ndarray, y: np.ndarray) -> dict:
     n_samples = len(y)
     n_positive = int(y.sum())
     n_negative = n_samples - n_positive
-    log.info("Training live heuristic", n_samples=n_samples, n_positive=n_positive, n_negative=n_negative)
+    log.info(
+        "Training live heuristic", n_samples=n_samples, n_positive=n_positive, n_negative=n_negative
+    )
 
     if n_samples < 20:
         # Cross-validation for tiny datasets
@@ -60,7 +65,9 @@ def train_live_heuristic(X: np.ndarray, y: np.ndarray) -> dict:
         }
 
     # Train/test split for larger datasets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
     model = lgb.LGBMClassifier(**params)
     model.fit(X_train, y_train)
 

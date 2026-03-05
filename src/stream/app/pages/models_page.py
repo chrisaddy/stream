@@ -1,11 +1,15 @@
 """Model Cards page with dynamic data from R2 and Plotly charts."""
 
 from fasthtml.common import *
+
 from stream.app.components import (
-    Card, DataGrid, DataReadout, DiagnosticFrame, Tip,
+    Card,
+    DataGrid,
+    DataReadout,
+    DiagnosticFrame,
+    Tip,
 )
 from stream.app.models import get_all_model_cards
-
 
 # Fallback descriptions when no card exists in R2
 _FALLBACK_CARDS = {
@@ -40,14 +44,19 @@ def _fmt(val, fmt=".4f"):
 def _metrics_table(metrics: dict, model_name: str):
     """Render a metrics table based on model type."""
     if not metrics:
-        return P("No metrics available. Run the training pipeline.", style="color: var(--fg-subtle);")
+        return P(
+            "No metrics available. Run the training pipeline.", style="color: var(--fg-subtle);"
+        )
 
     if model_name == "illicit-xgboost":
         cost = metrics.get("cost_analysis", {})
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td(Tip("PR-AUC")), Td(_fmt(metrics.get("pr_auc")), style="color: var(--fg-green);")),
+                Tr(
+                    Td(Tip("PR-AUC")),
+                    Td(_fmt(metrics.get("pr_auc")), style="color: var(--fg-green);"),
+                ),
                 Tr(Td(Tip("Threshold")), Td(_fmt(cost.get("threshold"), ".3f"))),
                 Tr(Td(Tip("Precision")), Td(_fmt(cost.get("precision"), ".3f"))),
                 Tr(Td(Tip("Recall")), Td(_fmt(cost.get("recall"), ".3f"))),
@@ -63,9 +72,21 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Logistic"), Th("XGBoost"))),
             Tbody(
-                Tr(Td(Tip("Accuracy")), Td(_fmt(lr.get("accuracy"))), Td(_fmt(xgb.get("accuracy")), style="color: var(--fg-green);")),
-                Tr(Td(Tip("F1 (macro)")), Td(_fmt(lr.get("f1_macro"))), Td(_fmt(xgb.get("f1_macro")), style="color: var(--fg-green);")),
-                Tr(Td(Tip("Log Loss")), Td(_fmt(lr.get("log_loss"))), Td(_fmt(xgb.get("log_loss")), style="color: var(--fg-green);")),
+                Tr(
+                    Td(Tip("Accuracy")),
+                    Td(_fmt(lr.get("accuracy"))),
+                    Td(_fmt(xgb.get("accuracy")), style="color: var(--fg-green);"),
+                ),
+                Tr(
+                    Td(Tip("F1 (macro)")),
+                    Td(_fmt(lr.get("f1_macro"))),
+                    Td(_fmt(xgb.get("f1_macro")), style="color: var(--fg-green);"),
+                ),
+                Tr(
+                    Td(Tip("Log Loss")),
+                    Td(_fmt(lr.get("log_loss"))),
+                    Td(_fmt(xgb.get("log_loss")), style="color: var(--fg-green);"),
+                ),
             ),
             cls="spark-table",
         )
@@ -74,7 +95,10 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td(Tip("MAE")), Td(f"{_fmt(metrics.get('mae'))} sat/vB", style="color: var(--fg-green);")),
+                Tr(
+                    Td(Tip("MAE")),
+                    Td(f"{_fmt(metrics.get('mae'))} sat/vB", style="color: var(--fg-green);"),
+                ),
                 Tr(Td(Tip("RMSE")), Td(f"{_fmt(metrics.get('rmse'))} sat/vB")),
                 Tr(Td(Tip("MAPE")), Td(_fmt(metrics.get("mape")))),
                 Tr(Td(Tip("Median AE")), Td(f"{_fmt(metrics.get('median_ae'))} sat/vB")),
@@ -86,7 +110,10 @@ def _metrics_table(metrics: dict, model_name: str):
         return Table(
             Thead(Tr(Th("Metric"), Th("Value"))),
             Tbody(
-                Tr(Td(Tip("MAE")), Td(_fmt(metrics.get("mae"), ".2f"), style="color: var(--fg-green);")),
+                Tr(
+                    Td(Tip("MAE")),
+                    Td(_fmt(metrics.get("mae"), ".2f"), style="color: var(--fg-green);"),
+                ),
                 Tr(Td(Tip("R²")), Td(_fmt(metrics.get("r2")))),
                 Tr(Td(Tip("Median AE")), Td(_fmt(metrics.get("median_ae"), ".2f"))),
                 Tr(Td(Tip("Samples")), Td(str(metrics.get("n_samples", "—")))),
@@ -105,7 +132,7 @@ def _data_summary(data: dict):
     items = []
     for key, val in data.items():
         if key == "feature_names":
-            continue  # Skip raw feature names
+            continue  # Render separately in a dedicated features section
         if isinstance(val, dict):
             for k, v in val.items():
                 items.append(DataReadout(f"{key}/{k}".upper(), str(v)))
@@ -115,8 +142,32 @@ def _data_summary(data: dict):
     if not items:
         return None
     return Div(
-        H4("Training Data", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;"),
+        H4(
+            "Training Data",
+            style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;",
+        ),
         DataGrid(*items[:6]),
+        style="margin-bottom: 12px;",
+    )
+
+
+def _feature_list(data: dict):
+    """Render feature names from model card data summary."""
+    names = data.get("feature_names", []) if data else []
+    if not isinstance(names, list) or not names:
+        return None
+
+    rows = [Tr(Td(str(i + 1)), Td(str(name))) for i, name in enumerate(names)]
+    return Div(
+        H4(
+            "Features",
+            style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;",
+        ),
+        Table(
+            Thead(Tr(Th("#"), Th("Name"))),
+            Tbody(*rows),
+            cls="spark-table",
+        ),
         style="margin-bottom: 12px;",
     )
 
@@ -139,10 +190,17 @@ def _chart_section(model_name: str, card: dict):
         label = chart_type.replace("_", " ").title()
         divs.append(
             Div(
-                H4(label, style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
+                H4(
+                    label,
+                    style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;",
+                ),
                 Div(
                     id=f"chart-{model_name}-{chart_type}",
-                    **{"hx-get": f"/api/v1/models/{model_name}/chart/{chart_type}", "hx-trigger": "load", "hx-swap": "innerHTML"},
+                    **{
+                        "hx-get": f"/api/v1/models/{model_name}/chart/{chart_type}",
+                        "hx-trigger": "load",
+                        "hx-swap": "innerHTML",
+                    },
                     style="min-height: 300px; display: flex; align-items: center; justify-content: center;",
                 ),
                 style="margin-bottom: 16px;",
@@ -169,7 +227,10 @@ def _model_card(model_name: str, card: dict):
 
     if created:
         children.append(
-            P(f"Last trained: {created} UTC", style="color: var(--fg-dim); font-size: 10px; margin-bottom: 12px;")
+            P(
+                f"Last trained: {created} UTC",
+                style="color: var(--fg-dim); font-size: 10px; margin-bottom: 12px;",
+            )
         )
 
     # Data summary
@@ -177,12 +238,20 @@ def _model_card(model_name: str, card: dict):
     if ds:
         children.append(ds)
 
+    # Feature names
+    fl = _feature_list(data)
+    if fl:
+        children.append(fl)
+
     # Training params
     if params:
         param_str = " | ".join(f"{k}: {v}" for k, v in list(params.items())[:4])
         children.append(
             Div(
-                H4("Training Config", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;"),
+                H4(
+                    "Training Config",
+                    style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;",
+                ),
                 P(param_str, style="font-size: 11px; color: var(--fg-dim);"),
                 style="margin-bottom: 12px;",
             )
@@ -191,7 +260,10 @@ def _model_card(model_name: str, card: dict):
     # Metrics table
     children.append(
         Div(
-            H4("Metrics", style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;"),
+            H4(
+                "Metrics",
+                style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;",
+            ),
             _metrics_table(metrics, model_name),
             style="margin-bottom: 12px;",
         )

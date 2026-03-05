@@ -20,3 +20,6 @@ demo/clips/
 demo/narration/
 demo/voice-samples/
 src/stream/app/static/*.mp4
+
+# Private walkthrough/interview notes
+walkthrough/

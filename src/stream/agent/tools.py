@@ -14,7 +14,11 @@ log = structlog.get_logger()
 TOOL_DEFINITIONS = [
     {
         "name": "get_alert_details",
-        "description": "Look up the full alert record for a transaction, including risk score, model name, SHAP explanation, and review status.",
+        "description": (
+            "Look up the full alert record for a transaction, "
+            "including risk score, model name, SHAP explanation, "
+            "and review status."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -25,7 +29,11 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "lookup_transaction_onchain",
-        "description": "Look up a Bitcoin transaction on-chain via mempool.space API. Returns inputs, outputs, fees, confirmation status.",
+        "description": (
+            "Look up a Bitcoin transaction on-chain via "
+            "mempool.space API. Returns inputs, outputs, "
+            "fees, confirmation status."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -36,11 +44,19 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "query_prediction_history",
-        "description": "Query recent prediction records above a risk threshold. Shows what the system has been scoring recently.",
+        "description": (
+            "Query recent prediction records above a risk "
+            "threshold. Shows what the system has been "
+            "scoring recently."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "min_risk_score": {"type": "number", "description": "Minimum risk score to filter by (0-1)", "default": 0.5},
+                "min_risk_score": {
+                    "type": "number",
+                    "description": "Minimum risk score to filter by (0-1)",
+                    "default": 0.5,
+                },
                 "limit": {"type": "integer", "description": "Max results to return", "default": 10},
             },
             "required": [],
@@ -48,7 +64,11 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "get_review_history",
-        "description": "Query historical analyst reviews (TP/FP verdicts). Shows patterns of true vs false positives.",
+        "description": (
+            "Query historical analyst reviews (TP/FP "
+            "verdicts). Shows patterns of true vs false "
+            "positives."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -59,12 +79,20 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "check_similar_transactions",
-        "description": "Find alerts with similar fee_rate and vsize profiles to the target transaction. Helps identify patterns.",
+        "description": (
+            "Find alerts with similar fee_rate and vsize "
+            "profiles to the target transaction. "
+            "Helps identify patterns."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "tx_id": {"type": "string", "description": "The reference transaction ID"},
-                "tolerance": {"type": "number", "description": "How similar (0-1, where 0.2 = within 20%)", "default": 0.3},
+                "tolerance": {
+                    "type": "number",
+                    "description": "How similar (0-1, where 0.2 = within 20%)",
+                    "default": 0.3,
+                },
             },
             "required": ["tx_id"],
         },
@@ -93,6 +121,7 @@ async def execute_tool(name: str, args: dict) -> str:
 
 def _get_alert_details(tx_id: str) -> str:
     from stream.models.alerts import AlertRecord
+
     db = SessionLocal()
     try:
         alert = db.query(AlertRecord).filter(AlertRecord.tx_id == tx_id).first()
@@ -105,7 +134,9 @@ def _get_alert_details(tx_id: str) -> str:
             f"  Risk Label: {alert.risk_label}\n"
             f"  Model: {alert.model_name}\n"
             f"  Status: {alert.status}\n"
-            f"  Raw Input: vsize={raw.get('vsize', '?')}, fee={raw.get('fee', '?')}, fee_rate={raw.get('fee_rate', '?')}\n"
+            f"  Raw Input: vsize={raw.get('vsize', '?')}, "
+            f"fee={raw.get('fee', '?')}, "
+            f"fee_rate={raw.get('fee_rate', '?')}\n"
             f"  SHAP: {alert.explanation}\n"
             f"  Narrative: {alert.narrative or 'None generated yet'}"
         )
@@ -118,7 +149,11 @@ async def _lookup_onchain(tx_id: str) -> str:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"https://mempool.space/api/tx/{tx_id}")
             if resp.status_code != 200:
-                return f"mempool.space returned {resp.status_code} for {tx_id}. Transaction may be unconfirmed or invalid."
+                return (
+                    f"mempool.space returned {resp.status_code} "
+                    f"for {tx_id}. Transaction may be "
+                    f"unconfirmed or invalid."
+                )
             tx = resp.json()
 
         n_inputs = len(tx.get("vin", []))
@@ -150,6 +185,7 @@ async def _lookup_onchain(tx_id: str) -> str:
 
 def _query_predictions(min_score: float, limit: int) -> str:
     from stream.models.predictions import PredictionRecord
+
     db = SessionLocal()
     try:
         preds = (
@@ -163,7 +199,10 @@ def _query_predictions(min_score: float, limit: int) -> str:
             return f"No predictions found above {min_score}"
         lines = [f"Recent high-risk predictions (>= {min_score}):"]
         for p in preds:
-            lines.append(f"  {p.timestamp}: score={p.risk_score:.4f} label={p.risk_label} model={p.model_name}")
+            lines.append(
+                f"  {p.timestamp}: score={p.risk_score:.4f} "
+                f"label={p.risk_label} model={p.model_name}"
+            )
         return "\n".join(lines)
     finally:
         db.close()
@@ -171,6 +210,7 @@ def _query_predictions(min_score: float, limit: int) -> str:
 
 def _get_reviews(limit: int) -> str:
     from stream.models.reviews import ReviewRecord
+
     db = SessionLocal()
     try:
         reviews = db.query(ReviewRecord).order_by(ReviewRecord.timestamp.desc()).limit(limit).all()
@@ -183,7 +223,11 @@ def _get_reviews(limit: int) -> str:
             f"Historical TP rate: {tp_count / max(len(reviews), 1):.0%}",
         ]
         for r in reviews[:5]:
-            lines.append(f"  {r.timestamp}: tx={r.tx_id[:16]}... verdict={r.verdict} score={r.risk_score_at_review:.4f}")
+            lines.append(
+                f"  {r.timestamp}: tx={r.tx_id[:16]}... "
+                f"verdict={r.verdict} "
+                f"score={r.risk_score_at_review:.4f}"
+            )
         return "\n".join(lines)
     finally:
         db.close()
@@ -191,6 +235,7 @@ def _get_reviews(limit: int) -> str:
 
 def _check_similar(tx_id: str, tolerance: float) -> str:
     from stream.models.alerts import AlertRecord
+
     db = SessionLocal()
     try:
         target = db.query(AlertRecord).filter(AlertRecord.tx_id == tx_id).first()
@@ -200,7 +245,12 @@ def _check_similar(tx_id: str, tolerance: float) -> str:
         ref_fee_rate = target.raw_input.get("fee_rate", 0)
         ref_vsize = target.raw_input.get("vsize", 0)
 
-        all_alerts = db.query(AlertRecord).filter(AlertRecord.tx_id != tx_id, AlertRecord.raw_input.isnot(None)).limit(100).all()
+        all_alerts = (
+            db.query(AlertRecord)
+            .filter(AlertRecord.tx_id != tx_id, AlertRecord.raw_input.isnot(None))
+            .limit(100)
+            .all()
+        )
 
         similar = []
         for a in all_alerts:
@@ -220,7 +270,6 @@ def _check_similar(tx_id: str, tolerance: float) -> str:
         lines = [f"Found {len(similar)} similar transactions:"]
         for a, dist in similar[:5]:
             raw = a.raw_input or {}
-            reviewed = a.status != "pending"
             lines.append(
                 f"  {a.tx_id[:16]}... score={a.risk_score:.4f} "
                 f"fee_rate={raw.get('fee_rate', '?'):.1f} vsize={raw.get('vsize', '?')} "

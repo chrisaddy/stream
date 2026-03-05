@@ -65,14 +65,21 @@ def build_graph(nodes: list[dict], channels: list[dict] | None = None) -> nx.Gra
 
     for node in nodes:
         pubkey = node.get("publicKey", node.get("public_key", ""))
-        G.add_node(pubkey, **{
-            "alias": node.get("alias", ""),
-            "capacity": node.get("capacity", 0),
-            "channels": node.get("channels", node.get("active_channel_count", 0)),
-            "first_seen": node.get("firstSeen", 0),
-            "city": node.get("city", {}).get("en", "") if isinstance(node.get("city"), dict) else "",
-            "country": node.get("country", {}).get("en", "") if isinstance(node.get("country"), dict) else "",
-        })
+        G.add_node(
+            pubkey,
+            **{
+                "alias": node.get("alias", ""),
+                "capacity": node.get("capacity", 0),
+                "channels": node.get("channels", node.get("active_channel_count", 0)),
+                "first_seen": node.get("firstSeen", 0),
+                "city": node.get("city", {}).get("en", "")
+                if isinstance(node.get("city"), dict)
+                else "",
+                "country": node.get("country", {}).get("en", "")
+                if isinstance(node.get("country"), dict)
+                else "",
+            },
+        )
 
     if channels:
         for ch in channels:

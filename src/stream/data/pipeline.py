@@ -9,7 +9,6 @@ Training pipelines pull from the same R2 keys when they run.
 import json
 import os
 from datetime import datetime, timezone
-from io import BytesIO
 
 import httpx
 import structlog
@@ -30,6 +29,7 @@ MAX_LIGHTNING_SNAPSHOTS = 500
 def _get_s3_client():
     """Get boto3 S3 client for R2."""
     import boto3
+
     from stream.config import settings
 
     if not settings.R2_ENDPOINT_URL:
@@ -104,7 +104,12 @@ def append_fee_snapshots(new_snapshots: list[dict]):
     # Keep most recent, capped
     combined = combined[-MAX_FEE_SNAPSHOTS:]
     _save_json_to_r2(combined, FEE_SNAPSHOTS_KEY)
-    log.info("Fee snapshots accumulated", existing=len(existing), new=len(new_snapshots), total=len(combined))
+    log.info(
+        "Fee snapshots accumulated",
+        existing=len(existing),
+        new=len(new_snapshots),
+        total=len(combined),
+    )
     return len(combined)
 
 
@@ -168,4 +173,5 @@ async def collect_data_pipeline(fee_snapshots: int = 10):
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(collect_data_pipeline())
