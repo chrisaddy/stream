@@ -14,7 +14,9 @@ _investigations: dict[str, dict] = {}
 
 SYSTEM_PROMPT = """You are a Bitcoin compliance investigation agent for the STREAM platform.
 
-Your role is to investigate flagged Bitcoin transactions by gathering evidence using the tools available to you, then producing a structured investigation report.
+Your role is to investigate flagged Bitcoin transactions by gathering
+evidence using the tools available to you, then producing a structured
+investigation report.
 
 Investigation protocol:
 1. First, look up the alert details to understand why this transaction was flagged.
@@ -56,18 +58,28 @@ async def run_investigation(tx_id: str) -> dict:
         import anthropic
     except ImportError:
         investigation["status"] = "ERROR"
-        investigation["steps"].append({"type": "error", "content": "anthropic package not installed"})
+        investigation["steps"].append(
+            {"type": "error", "content": "anthropic package not installed"}
+        )
         return investigation
 
     if not settings.ANTHROPIC_API_KEY:
         investigation["status"] = "ERROR"
-        investigation["steps"].append({"type": "error", "content": "ANTHROPIC_API_KEY not configured"})
+        investigation["steps"].append(
+            {"type": "error", "content": "ANTHROPIC_API_KEY not configured"}
+        )
         return investigation
 
     client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     messages = [
-        {"role": "user", "content": f"Investigate alert for transaction {tx_id}. Follow the investigation protocol."}
+        {
+            "role": "user",
+            "content": (
+                f"Investigate alert for transaction {tx_id}."
+                " Follow the investigation protocol."
+            ),
+        }
     ]
 
     max_turns = 8
@@ -96,15 +108,21 @@ async def run_investigation(tx_id: str) -> dict:
                 investigation["steps"].append({"type": "thinking", "content": block.text})
             elif block.type == "tool_use":
                 tool_uses.append(block)
-                investigation["steps"].append({
-                    "type": "tool_call",
-                    "tool": block.name,
-                    "input": block.input,
-                })
+                investigation["steps"].append(
+                    {
+                        "type": "tool_call",
+                        "tool": block.name,
+                        "input": block.input,
+                    }
+                )
 
         # If no tool use, this is the final response
         if response.stop_reason == "end_turn" or not tool_uses:
-            final_text = "\n".join(text_blocks) if text_blocks else "Investigation complete — no final report generated."
+            final_text = (
+                "\n".join(text_blocks)
+                if text_blocks
+                else "Investigation complete — no final report generated."
+            )
             investigation["report"] = final_text
             investigation["status"] = "COMPLETE"
             investigation["completed_at"] = time.time()
@@ -115,16 +133,20 @@ async def run_investigation(tx_id: str) -> dict:
         tool_results = []
         for tool_use in tool_uses:
             result = await execute_tool(tool_use.name, tool_use.input)
-            investigation["steps"].append({
-                "type": "tool_result",
-                "tool": tool_use.name,
-                "result": result[:500],  # truncate for display
-            })
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": result,
-            })
+            investigation["steps"].append(
+                {
+                    "type": "tool_result",
+                    "tool": tool_use.name,
+                    "result": result[:500],  # truncate for display
+                }
+            )
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result,
+                }
+            )
 
         messages.append({"role": "user", "content": tool_results})
 
@@ -132,5 +154,7 @@ async def run_investigation(tx_id: str) -> dict:
     investigation["status"] = "COMPLETE"
     investigation["completed_at"] = time.time()
     if not investigation["report"]:
-        investigation["report"] = "Investigation reached maximum depth. Review the gathered evidence above."
+        investigation["report"] = (
+            "Investigation reached maximum depth. Review the gathered evidence above."
+        )
     return investigation

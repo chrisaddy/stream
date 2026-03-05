@@ -79,9 +79,7 @@ class TestRiskThreshold:
 
 class TestScoreTransaction:
     def test_returns_expected_keys(self):
-        result = asyncio.new_event_loop().run_until_complete(
-            score_transaction("abc123", 250, 2500)
-        )
+        result = asyncio.new_event_loop().run_until_complete(score_transaction("abc123", 250, 2500))
         assert "risk_score" in result
         assert "risk_label" in result
         assert "model_name" in result

@@ -19,7 +19,9 @@ def trained_model():
     X_test = np.random.randn(50, 10)
     y_test = np.random.choice([0, 1], 50, p=[0.9, 0.1])
 
-    model = train_xgboost(X_train, y_train, X_test, y_test, n_estimators=10, early_stopping_rounds=5)
+    model = train_xgboost(
+        X_train, y_train, X_test, y_test, n_estimators=10, early_stopping_rounds=5
+    )
     return model, X_test
 
 

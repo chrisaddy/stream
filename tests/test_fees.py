@@ -1,9 +1,8 @@
 """Test fee estimation."""
 
-import numpy as np
 import pytest
 
-from stream.fees.features import extract_features, build_feature_matrix
+from stream.fees.features import build_feature_matrix, extract_features
 
 
 @pytest.fixture
@@ -51,7 +50,13 @@ def test_extract_features_empty_blocks():
     snapshot = {
         "timestamp": "2024-01-15T12:00:00Z",
         "mempool": {"count": 0, "vsize": 0, "total_fee": 0},
-        "recommended_fees": {"fastestFee": 1, "halfHourFee": 1, "hourFee": 1, "economyFee": 1, "minimumFee": 1},
+        "recommended_fees": {
+            "fastestFee": 1,
+            "halfHourFee": 1,
+            "hourFee": 1,
+            "economyFee": 1,
+            "minimumFee": 1,
+        },
         "projected_blocks": [],
         "tip_height": 0,
     }

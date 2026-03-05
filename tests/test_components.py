@@ -20,15 +20,17 @@ class TestFeedRow:
 
     def test_model_name_badge_heuristic(self):
         """Should show HEURISTIC badge for heuristic model."""
-        row = FeedRow("12:00:00", "abc123", 250, 10.0, 0.5, "MED",
-                      threshold=0.7, model_name="live-heuristic")
+        row = FeedRow(
+            "12:00:00", "abc123", 250, 10.0, 0.5, "MED", threshold=0.7, model_name="live-heuristic"
+        )
         row_str = str(row)
         assert "HEURISTIC" in row_str
 
     def test_model_name_badge_ml(self):
         """Should show ML badge for ML model."""
-        row = FeedRow("12:00:00", "abc123", 250, 10.0, 0.5, "MED",
-                      threshold=0.7, model_name="illicit-xgboost")
+        row = FeedRow(
+            "12:00:00", "abc123", 250, 10.0, 0.5, "MED", threshold=0.7, model_name="illicit-xgboost"
+        )
         row_str = str(row)
         assert "ML" in row_str
 

@@ -3,6 +3,7 @@
 import json
 import os
 import pickle
+
 import structlog
 
 log = structlog.get_logger()
@@ -17,7 +18,9 @@ def _load_from_r2(path: str) -> bytes | None:
     """Try to load model bytes from R2 via boto3 (sync-safe)."""
     try:
         import boto3
+
         from stream.config import settings
+
         if not settings.R2_ENDPOINT_URL:
             return None
         s3 = boto3.client(
@@ -58,6 +61,7 @@ def load_model(name: str, deserializer=None):
         model = deserializer(data)
     else:
         from io import BytesIO
+
         model = pickle.load(BytesIO(data))
 
     _models[name] = model

@@ -2,21 +2,20 @@
 
 import json
 import os
-import pickle
+
 import structlog
 from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 
 from stream.fees.collector import collect_snapshot
+from stream.fees.evaluate import evaluate_fee_model
 from stream.fees.features import build_feature_matrix, build_targets
 from stream.fees.model import serialize_fee_model, train_fee_model
-from stream.fees.evaluate import evaluate_fee_model
 from stream.model_card import (
     build_model_card,
-    save_model_card,
     feature_importance_chart,
-    regime_chart,
     fig_to_png,
+    save_model_card,
 )
 
 log = structlog.get_logger()
@@ -31,7 +30,9 @@ def load_cached_snapshots() -> list[dict]:
     # Try R2
     try:
         import boto3
+
         from stream.config import settings
+
         if settings.R2_ENDPOINT_URL:
             s3 = boto3.client(
                 "s3",
@@ -64,7 +65,9 @@ def save_snapshots(snapshots: list[dict]):
 
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
         s3.upload_from_file_object(BytesIO(data), SNAPSHOT_PATH)
         log.info("Snapshots saved to R2", count=len(snapshots))
@@ -78,8 +81,9 @@ def save_snapshots(snapshots: list[dict]):
 @task(name="collect-mempool-data")
 async def collect_data(n_snapshots: int = 100):
     """Collect new mempool snapshots."""
-    import httpx
     import asyncio
+
+    import httpx
 
     snapshots = []
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -103,7 +107,6 @@ def featurize(snapshots: list[dict]):
 
 @task(name="train-fee-model")
 def train_model(X, y):
-    import numpy as np
 
     # Train for 1-block confirmation target
     feature_cols = [c for c in X.columns if not c.startswith("rec_")]
@@ -122,7 +125,6 @@ def train_model(X, y):
 @task(name="evaluate-fee-model")
 def evaluate_model(model, X_features, y_target, feature_cols):
     """Evaluate fee model and return metrics."""
-    import numpy as np
 
     if model is None:
         return None
@@ -149,7 +151,9 @@ def save_model(model, feature_cols=None, name: str = "fee-lgbm"):
         return
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
         model_bytes = serialize_fee_model(model, feature_cols)
         s3.upload_from_file_object(BytesIO(model_bytes), f"models/{name}/latest.pkl")
@@ -171,7 +175,7 @@ def build_card(model, metrics, feature_cols, X_features, y_target):
     card = build_model_card(
         name="fee-lgbm",
         description="LightGBM fee estimator predicting optimal sat/vB for 1-block confirmation. "
-                    "Uses live mempool state features.",
+        "Uses live mempool state features.",
         metrics={
             "mae": metrics["mae"],
             "rmse": metrics["rmse"],
@@ -210,11 +214,11 @@ def create_artifacts(metrics, card):
 ## Metrics
 | Metric | Value |
 |--------|-------|
-| MAE | {metrics['mae']:.4f} sat/vB |
-| RMSE | {metrics['rmse']:.4f} sat/vB |
-| MAPE | {metrics['mape']:.4f} |
-| Median AE | {metrics['median_ae']:.4f} sat/vB |
-| Samples | {metrics['n_samples']} |
+| MAE | {metrics["mae"]:.4f} sat/vB |
+| RMSE | {metrics["rmse"]:.4f} sat/vB |
+| MAPE | {metrics["mape"]:.4f} |
+| Median AE | {metrics["median_ae"]:.4f} sat/vB |
+| Samples | {metrics["n_samples"]} |
 """
     create_markdown_artifact(key="fee-lgbm-metrics", markdown=markdown)
 
@@ -267,4 +271,5 @@ async def train_fees_pipeline(collect_new: bool = True):
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(train_fees_pipeline())

@@ -25,6 +25,7 @@ def _load_threshold_from_db() -> float:
     """Load threshold from Postgres, defaulting to 0.7."""
     try:
         from stream.db import load_setting
+
         val = load_setting("risk_threshold", "0.7")
         return float(val)
     except Exception:
@@ -43,6 +44,7 @@ def set_risk_threshold(value: float):
     _risk_threshold = max(0.05, min(0.9, value))
     try:
         from stream.db import save_setting
+
         save_setting("risk_threshold", str(_risk_threshold))
     except Exception as e:
         log.warning("Failed to persist threshold", error=str(e))
@@ -117,6 +119,7 @@ def _try_river_model(fee_rate: float, vsize: int, fee: int) -> float | None:
     """Attempt scoring with the online model. Returns score or None."""
     try:
         from stream.feedback.pipeline import river_predict_one
+
         return river_predict_one(fee_rate, vsize, fee)
     except Exception:
         return None
@@ -126,6 +129,7 @@ def _try_learned_model(fee_rate: float, vsize: int, fee: int) -> float | None:
     """Attempt scoring with the learned feedback model. Returns score or None."""
     try:
         from stream.feedback.pipeline import get_learned_model
+
         model = get_learned_model()
         if model is None:
             return None
@@ -141,14 +145,13 @@ def _get_anomaly_score(fee_rate: float, vsize: int, fee: int) -> float:
     """Get anomaly score from Half-Space Trees detector."""
     try:
         from stream.anomaly.detector import score_anomaly
+
         return score_anomaly(fee_rate, vsize, fee)
     except Exception:
         return 0.0
 
 
-async def score_transaction(
-    txid: str, vsize: int, fee: int
-) -> dict:
+async def score_transaction(txid: str, vsize: int, fee: int) -> dict:
     """Score a live transaction — prefers online model → learned model → heuristic.
 
     Scoring cascade: online model first, then batch LightGBM, then heuristic.
@@ -183,7 +186,9 @@ async def score_transaction(
 
     inference_ms = (time.time() - start) * 1000
     threshold = get_risk_threshold()
-    risk_label = "HIGH" if risk_score > threshold else "MED" if risk_score > threshold * 0.6 else "LOW"
+    risk_label = (
+        "HIGH" if risk_score > threshold else "MED" if risk_score > threshold * 0.6 else "LOW"
+    )
 
     input_hash = hashlib.sha256(
         json.dumps({"txid": txid, "vsize": vsize, "fee": fee}).encode()
@@ -192,6 +197,7 @@ async def score_transaction(
     # Feed drift monitor
     try:
         from stream.drift.monitor import record_score
+
         record_score(risk_score)
     except Exception:
         pass

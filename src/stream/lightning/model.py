@@ -6,11 +6,16 @@ from io import BytesIO
 import lightgbm as lgb
 import numpy as np
 
-
 FEATURE_COLS = [
-    "degree", "channels", "avg_neighbor_capacity", "max_neighbor_capacity",
-    "capacity_per_channel", "betweenness", "closeness",
-    "avg_channel_capacity", "total_edge_capacity",
+    "degree",
+    "channels",
+    "avg_neighbor_capacity",
+    "max_neighbor_capacity",
+    "capacity_per_channel",
+    "betweenness",
+    "closeness",
+    "avg_channel_capacity",
+    "total_edge_capacity",
 ]
 
 
@@ -38,7 +43,8 @@ def train_capacity_model(
     if len(X) > 20:
         split = int(len(X) * 0.8)
         model.fit(
-            X[:split], y[:split],
+            X[:split],
+            y[:split],
             eval_set=[(X[split:], y[split:])],
             callbacks=[lgb.early_stopping(10, verbose=False)],
         )

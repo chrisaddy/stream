@@ -8,11 +8,10 @@ import pickle
 from io import BytesIO
 
 import numpy as np
+import xgboost as xgb
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import xgboost as xgb
 
 
 def train_logistic_baseline(

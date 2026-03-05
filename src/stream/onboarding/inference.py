@@ -92,17 +92,17 @@ def predict_risk(model_data: dict, form_values: dict) -> dict:
 
         risk_label = LABEL_MAP.get(pred_class, "unknown")
         action = (
-            "auto_approve" if risk_label == "low_risk"
-            else "manual_review" if risk_label in ("medium_risk", "high_risk")
+            "auto_approve"
+            if risk_label == "low_risk"
+            else "manual_review"
+            if risk_label in ("medium_risk", "high_risk")
             else "block"
         )
 
         return {
             "predicted_class": pred_class,
             "risk_label": risk_label,
-            "class_probabilities": {
-                LABEL_MAP[i]: round(float(p), 4) for i, p in enumerate(probas)
-            },
+            "class_probabilities": {LABEL_MAP[i]: round(float(p), 4) for i, p in enumerate(probas)},
             "action": action,
             "source": "ML-MODEL",
         }

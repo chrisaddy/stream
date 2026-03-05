@@ -67,9 +67,9 @@ def compute_routing_score(features: dict) -> float:
 
     # Normalize and combine (simple weighted sum)
     score = (
-        0.3 * min(degree / 100, 1.0) +
-        0.3 * min(capacity / 10_000_000_000, 1.0) +  # 100 BTC in sats
-        0.2 * min(betweenness * 100, 1.0) +
-        0.2 * min(avg_channel / 1_000_000_000, 1.0)  # 10 BTC in sats
+        0.3 * min(degree / 100, 1.0)
+        + 0.3 * min(capacity / 10_000_000_000, 1.0)  # 100 BTC in sats
+        + 0.2 * min(betweenness * 100, 1.0)
+        + 0.2 * min(avg_channel / 1_000_000_000, 1.0)  # 10 BTC in sats
     )
     return round(score, 4)

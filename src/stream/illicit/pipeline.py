@@ -1,27 +1,26 @@
 """Prefect flow for illicit transaction detection training."""
 
-import json
 import structlog
 from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 
 from stream.illicit.data import load_pandas_dataset
+from stream.illicit.evaluate import full_evaluation
 from stream.illicit.preprocess import get_class_weight, temporal_split
 from stream.illicit.xgboost_model import (
-    get_shap_explainer,
     get_global_feature_importance,
+    get_shap_explainer,
     serialize_model,
     train_xgboost,
 )
-from stream.illicit.evaluate import full_evaluation
 from stream.model_card import (
     build_model_card,
-    save_model_card,
-    feature_importance_chart,
-    pr_curve_chart,
-    temporal_chart,
     confusion_matrix_chart,
+    feature_importance_chart,
     fig_to_png,
+    pr_curve_chart,
+    save_model_card,
+    temporal_chart,
 )
 
 log = structlog.get_logger()
@@ -54,7 +53,10 @@ def train_model(X_train, y_train, X_test, y_test):
     log.info("Training XGBoost", scale_pos_weight=f"{scale_pos_weight:.1f}")
 
     model = train_xgboost(
-        X_train, y_train, X_test, y_test,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
         scale_pos_weight=scale_pos_weight,
     )
     log.info("XGBoost training complete", best_iteration=model.best_iteration)
@@ -86,7 +88,9 @@ def save_model_to_r2(model, name: str = "illicit-xgboost"):
     """Save model to R2 via Prefect S3 block."""
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
         model_bytes = serialize_model(model)
         s3.upload_from_file_object(BytesIO(model_bytes), f"models/{name}/latest.pkl")
@@ -95,6 +99,7 @@ def save_model_to_r2(model, name: str = "illicit-xgboost"):
         # Fallback: save locally
         log.warning("R2 upload failed, saving locally", error=str(e))
         import os
+
         os.makedirs(f"models/{name}", exist_ok=True)
         with open(f"models/{name}/latest.pkl", "wb") as f:
             f.write(serialize_model(model))
@@ -108,21 +113,21 @@ def create_artifact(metrics: dict):
 ## Overall Metrics
 | Metric | Value |
 |--------|-------|
-| PR-AUC | {metrics['pr_auc']:.4f} |
-| Samples | {metrics['n_samples']:,} |
-| Illicit | {metrics['n_illicit']:,} |
-| Class Ratio | {metrics['class_ratio']} |
+| PR-AUC | {metrics["pr_auc"]:.4f} |
+| Samples | {metrics["n_samples"]:,} |
+| Illicit | {metrics["n_illicit"]:,} |
+| Class Ratio | {metrics["class_ratio"]} |
 
 ## Cost-Sensitive Threshold
 | Metric | Value |
 |--------|-------|
-| Threshold | {metrics['cost_analysis']['threshold']:.3f} |
-| Precision | {metrics['cost_analysis']['precision']:.3f} |
-| Recall | {metrics['cost_analysis']['recall']:.3f} |
-| F1 | {metrics['cost_analysis']['f1']:.3f} |
-| False Negatives | {metrics['cost_analysis']['fn_count']} |
-| False Positives | {metrics['cost_analysis']['fp_count']} |
-| Total Cost | ${metrics['cost_analysis']['total_cost']:,.0f} |
+| Threshold | {metrics["cost_analysis"]["threshold"]:.3f} |
+| Precision | {metrics["cost_analysis"]["precision"]:.3f} |
+| Recall | {metrics["cost_analysis"]["recall"]:.3f} |
+| F1 | {metrics["cost_analysis"]["f1"]:.3f} |
+| False Negatives | {metrics["cost_analysis"]["fn_count"]} |
+| False Positives | {metrics["cost_analysis"]["fp_count"]} |
+| Total Cost | ${metrics["cost_analysis"]["total_cost"]:,.0f} |
 """
     create_markdown_artifact(key="illicit-xgboost-metrics", markdown=markdown)
 
@@ -130,7 +135,6 @@ def create_artifact(metrics: dict):
 @task(name="build-illicit-model-card")
 def build_card(model, metrics, X_train, X_test, y_train, y_test):
     """Build model card with full metadata and save to R2."""
-    import numpy as np
 
     # SHAP feature importance
     explainer = get_shap_explainer(model)
@@ -148,7 +152,7 @@ def build_card(model, metrics, X_train, X_test, y_train, y_test):
     card = build_model_card(
         name="illicit-xgboost",
         description="XGBoost classifier for illicit Bitcoin transaction detection. "
-                    "Uses 166 transaction-level features from the Elliptic dataset.",
+        "Uses 166 transaction-level features from the Elliptic dataset.",
         metrics={
             "pr_auc": metrics["pr_auc"],
             "cost_analysis": metrics["cost_analysis"],

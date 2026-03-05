@@ -4,7 +4,6 @@ import numpy as np
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     accuracy_score,
-    classification_report,
     f1_score,
     log_loss,
 )
@@ -60,10 +59,12 @@ def per_tier_analysis(
     for i, name in enumerate(tier_names):
         mask = y_true == i
         pred_mask = y_pred == i
-        results.append({
-            "tier": name,
-            "actual_count": int(mask.sum()),
-            "predicted_count": int(pred_mask.sum()),
-            "true_positive_rate": float((mask & pred_mask).sum() / max(mask.sum(), 1)),
-        })
+        results.append(
+            {
+                "tier": name,
+                "actual_count": int(mask.sum()),
+                "predicted_count": int(pred_mask.sum()),
+                "true_positive_rate": float((mask & pred_mask).sum() / max(mask.sum(), 1)),
+            }
+        )
     return results

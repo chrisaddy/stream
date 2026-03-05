@@ -9,14 +9,14 @@ from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 
 from stream.lightning.data import build_graph, get_top_nodes_connectivity
+from stream.lightning.evaluate import evaluate_capacity_model
 from stream.lightning.features import compute_all_features
 from stream.lightning.model import FEATURE_COLS, serialize_lightning_model, train_capacity_model
-from stream.lightning.evaluate import evaluate_capacity_model
 from stream.model_card import (
     build_model_card,
-    save_model_card,
     feature_importance_chart,
     fig_to_png,
+    save_model_card,
 )
 
 log = structlog.get_logger()
@@ -54,7 +54,9 @@ def save_features(features: list[dict], name: str = "lightning-lgbm"):
     key = f"models/{name}/features.json"
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
         s3.upload_from_file_object(BytesIO(data), key)
         log.info("Lightning features saved to R2", count=len(features))
@@ -105,12 +107,17 @@ def evaluate_model(model, features):
 def save_model(model, name: str = "lightning-lgbm"):
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
-        s3.upload_from_file_object(BytesIO(serialize_lightning_model(model)), f"models/{name}/latest.pkl")
+        s3.upload_from_file_object(
+            BytesIO(serialize_lightning_model(model)), f"models/{name}/latest.pkl"
+        )
     except Exception as e:
         log.warning("R2 upload failed, saving locally", error=str(e))
         import os
+
         os.makedirs(f"models/{name}", exist_ok=True)
         with open(f"models/{name}/latest.pkl", "wb") as f:
             f.write(serialize_lightning_model(model))
@@ -126,7 +133,7 @@ def build_card(model, metrics, features):
     card = build_model_card(
         name="lightning-lgbm",
         description="LightGBM regressor predicting optimal Lightning node capacity "
-                    "based on network topology features.",
+        "based on network topology features.",
         metrics={
             "mae": metrics["mae"],
             "r2": metrics["r2"],
@@ -165,10 +172,10 @@ def create_artifacts(metrics, card):
 ## Metrics
 | Metric | Value |
 |--------|-------|
-| MAE | {metrics['mae']:.2f} |
-| R² | {metrics['r2']:.4f} |
-| Median AE | {metrics['median_ae']:.2f} |
-| Samples | {metrics['n_samples']} |
+| MAE | {metrics["mae"]:.2f} |
+| R² | {metrics["r2"]:.4f} |
+| Median AE | {metrics["median_ae"]:.2f} |
+| Samples | {metrics["n_samples"]} |
 """
     create_markdown_artifact(key="lightning-lgbm-metrics", markdown=markdown)
 
@@ -206,4 +213,5 @@ async def train_lightning_pipeline():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(train_lightning_pipeline())

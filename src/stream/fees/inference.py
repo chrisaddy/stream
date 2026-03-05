@@ -9,10 +9,19 @@ log = structlog.get_logger()
 
 # Fallback feature columns for old pickles that didn't save feature_cols
 DEFAULT_FEATURE_COLS = [
-    "mempool_count", "mempool_vsize", "mempool_total_fee",
-    "n_projected_blocks", "hour_of_day", "day_of_week", "is_weekend",
-    "tip_height", "first_block_size", "first_block_fees",
-    "first_block_median_fee", "avg_block_size", "avg_block_fee",
+    "mempool_count",
+    "mempool_vsize",
+    "mempool_total_fee",
+    "n_projected_blocks",
+    "hour_of_day",
+    "day_of_week",
+    "is_weekend",
+    "tip_height",
+    "first_block_size",
+    "first_block_fees",
+    "first_block_median_fee",
+    "avg_block_size",
+    "avg_block_fee",
 ]
 
 

@@ -26,10 +26,10 @@ class ModelRace:
     def __init__(self):
         from river.compose import Pipeline
         from river.linear_model import LogisticRegression
+        from river.metrics import F1, Accuracy
         from river.naive_bayes import GaussianNB
         from river.preprocessing import StandardScaler
         from river.tree import HoeffdingTreeClassifier
-        from river.metrics import F1, Accuracy
         from river.utils import Rolling
 
         self.models = [
@@ -121,13 +121,15 @@ class ModelRace:
             except Exception:
                 cum_f1 = 0.0
 
-            standings.append({
-                "name": m.name,
-                "rolling_f1": round(rolling_f1, 4),
-                "rolling_accuracy": round(rolling_acc, 4),
-                "cumulative_f1": round(cum_f1, 4),
-                "n_total": m.n_total,
-            })
+            standings.append(
+                {
+                    "name": m.name,
+                    "rolling_f1": round(rolling_f1, 4),
+                    "rolling_accuracy": round(rolling_acc, 4),
+                    "cumulative_f1": round(cum_f1, 4),
+                    "n_total": m.n_total,
+                }
+            )
 
         standings.sort(key=lambda s: s["rolling_f1"], reverse=True)
         return standings

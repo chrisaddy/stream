@@ -5,10 +5,8 @@ ROC-AUC overestimates performance when negatives dominate.
 """
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
-    classification_report,
     f1_score,
     precision_recall_curve,
     precision_score,
@@ -86,15 +84,17 @@ def per_timestep_evaluation(
         p_t = y_prob[mask]
         preds = (p_t >= threshold).astype(int)
 
-        results.append({
-            "timestep": int(ts),
-            "n_samples": int(mask.sum()),
-            "n_illicit": int(y_t.sum()),
-            "precision": float(precision_score(y_t, preds, zero_division=0)),
-            "recall": float(recall_score(y_t, preds, zero_division=0)),
-            "f1": float(f1_score(y_t, preds, zero_division=0)),
-            "pr_auc": float(average_precision_score(y_t, p_t)) if y_t.sum() > 0 else 0.0,
-        })
+        results.append(
+            {
+                "timestep": int(ts),
+                "n_samples": int(mask.sum()),
+                "n_illicit": int(y_t.sum()),
+                "precision": float(precision_score(y_t, preds, zero_division=0)),
+                "recall": float(recall_score(y_t, preds, zero_division=0)),
+                "f1": float(f1_score(y_t, preds, zero_division=0)),
+                "pr_auc": float(average_precision_score(y_t, p_t)) if y_t.sum() > 0 else 0.0,
+            }
+        )
 
     return results
 

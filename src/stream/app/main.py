@@ -3,28 +3,28 @@
 import structlog
 from fasthtml.common import *
 
+from stream.app.api import register_api_routes
 from stream.app.models import load_all_models, load_lightning_features, load_model_cards
-from stream.db import engine
-from stream.models.base import Base
-from stream.models.predictions import PredictionRecord  # noqa: F401 — register table
-from stream.models.alerts import AlertRecord  # noqa: F401 — register table
-from stream.models.reviews import ReviewRecord  # noqa: F401 — register table
-from stream.models.settings import Setting  # noqa: F401 — register table
+from stream.app.pages.alerts import alerts_page
+from stream.app.pages.fees import fees_page
 from stream.app.pages.home import home_page
 from stream.app.pages.illicit import illicit_page
-from stream.app.pages.fees import fees_page
 from stream.app.pages.lightning import lightning_page
 from stream.app.pages.onboarding import onboarding_page
-from stream.app.pages.alerts import alerts_page
 from stream.app.pages.walkthrough import (
-    walkthrough_overview,
-    walkthrough_illicit,
-    walkthrough_fees,
     walkthrough_architecture,
-    walkthrough_online_ml,
     walkthrough_compliance,
+    walkthrough_fees,
+    walkthrough_illicit,
+    walkthrough_online_ml,
+    walkthrough_overview,
 )
-from stream.app.api import register_api_routes
+from stream.db import engine
+from stream.models.alerts import AlertRecord  # noqa: F401 — register table
+from stream.models.base import Base
+from stream.models.predictions import PredictionRecord  # noqa: F401 — register table
+from stream.models.reviews import ReviewRecord  # noqa: F401 — register table
+from stream.models.settings import Setting  # noqa: F401 — register table
 
 log = structlog.get_logger()
 
@@ -58,6 +58,7 @@ async def on_startup():
     # 5. Warm up online model from existing reviews
     try:
         from stream.feedback.pipeline import warm_up_river_model
+
         warm_up_river_model()
     except Exception as e:
         log.warning("Online ML warm-up failed on startup", error=str(e))
@@ -74,6 +75,7 @@ register_api_routes(rt)
 
 
 # === PAGE ROUTES ===
+
 
 @rt("/")
 def index():

@@ -27,22 +27,18 @@ def extract_features(snapshot: dict) -> dict:
         "mempool_count": mempool.get("count", 0),
         "mempool_vsize": mempool.get("vsize", 0),
         "mempool_total_fee": mempool.get("total_fee", 0),
-
         # Fee distribution from projected blocks
         "n_projected_blocks": len(blocks),
-
         # Current recommendations (these are targets, not features in production)
         "rec_fastest_fee": fees.get("fastestFee", 0),
         "rec_half_hour_fee": fees.get("halfHourFee", 0),
         "rec_hour_fee": fees.get("hourFee", 0),
         "rec_economy_fee": fees.get("economyFee", 0),
         "rec_minimum_fee": fees.get("minimumFee", 0),
-
         # Time features
         "hour_of_day": dt.hour,
         "day_of_week": dt.weekday(),
         "is_weekend": int(dt.weekday() >= 5),
-
         # Block tip
         "tip_height": snapshot.get("tip_height", 0),
     }
@@ -59,10 +55,15 @@ def extract_features(snapshot: dict) -> dict:
         features["avg_block_size"] = np.mean(block_sizes) if block_sizes else 0
         features["avg_block_fee"] = np.mean(block_fees) if block_fees else 0
     else:
-        features.update({
-            "first_block_size": 0, "first_block_fees": 0,
-            "first_block_median_fee": 0, "avg_block_size": 0, "avg_block_fee": 0,
-        })
+        features.update(
+            {
+                "first_block_size": 0,
+                "first_block_fees": 0,
+                "first_block_median_fee": 0,
+                "avg_block_size": 0,
+                "avg_block_fee": 0,
+            }
+        )
 
     return features
 
@@ -85,11 +86,13 @@ def build_targets(snapshots: list[dict]):
     targets = []
     for s in snapshots:
         fees = s.get("recommended_fees", {})
-        targets.append({
-            "target_1_block": fees.get("fastestFee", 0),
-            "target_3_blocks": fees.get("halfHourFee", 0),
-            "target_6_blocks": fees.get("hourFee", 0),
-            "target_12_blocks": fees.get("economyFee", 0),
-            "target_24_blocks": fees.get("minimumFee", 0),
-        })
+        targets.append(
+            {
+                "target_1_block": fees.get("fastestFee", 0),
+                "target_3_blocks": fees.get("halfHourFee", 0),
+                "target_6_blocks": fees.get("hourFee", 0),
+                "target_12_blocks": fees.get("economyFee", 0),
+                "target_24_blocks": fees.get("minimumFee", 0),
+            }
+        )
     return pd.DataFrame(targets)

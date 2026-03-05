@@ -5,19 +5,18 @@ from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 from sklearn.model_selection import train_test_split
 
+from stream.model_card import (
+    build_model_card,
+    calibration_chart,
+    fig_to_png,
+    save_model_card,
+)
 from stream.onboarding.data import encode_features, generate_synthetic_kyc
+from stream.onboarding.evaluate import calibration_analysis, evaluate_risk_model, per_tier_analysis
 from stream.onboarding.model import (
     serialize_onboarding_model,
     train_calibrated_xgboost,
     train_logistic_baseline,
-)
-from stream.onboarding.evaluate import evaluate_risk_model, calibration_analysis, per_tier_analysis
-from stream.model_card import (
-    build_model_card,
-    save_model_card,
-    calibration_chart,
-    feature_importance_chart,
-    fig_to_png,
 )
 
 log = structlog.get_logger()
@@ -48,7 +47,6 @@ def train_xgboost(X_train, y_train):
 
 @task(name="evaluate-onboarding-models")
 def evaluate_models(logistic, xgb, X_test, y_test, logistic_scaler, xgb_scaler):
-    import numpy as np
 
     X_test_lr = logistic_scaler.transform(X_test)
     X_test_xgb = xgb_scaler.transform(X_test)
@@ -67,8 +65,14 @@ def evaluate_models(logistic, xgb, X_test, y_test, logistic_scaler, xgb_scaler):
     # Per-tier analysis
     tiers = per_tier_analysis(y_test, xgb_pred)
 
-    log.info("LR metrics", **{k: f"{v:.4f}" if isinstance(v, float) else v for k, v in lr_metrics.items()})
-    log.info("XGB metrics", **{k: f"{v:.4f}" if isinstance(v, float) else v for k, v in xgb_metrics.items()})
+    log.info(
+        "LR metrics",
+        **{k: f"{v:.4f}" if isinstance(v, float) else v for k, v in lr_metrics.items()},
+    )
+    log.info(
+        "XGB metrics",
+        **{k: f"{v:.4f}" if isinstance(v, float) else v for k, v in xgb_metrics.items()},
+    )
 
     return lr_metrics, xgb_metrics, cal, tiers
 
@@ -77,12 +81,17 @@ def evaluate_models(logistic, xgb, X_test, y_test, logistic_scaler, xgb_scaler):
 def save_model(model, scaler, name: str = "onboarding-xgb"):
     try:
         from io import BytesIO
+
         from prefect_aws.s3 import S3Bucket
+
         s3 = S3Bucket.load("model-store")
-        s3.upload_from_file_object(BytesIO(serialize_onboarding_model(model, scaler)), f"models/{name}/latest.pkl")
+        s3.upload_from_file_object(
+            BytesIO(serialize_onboarding_model(model, scaler)), f"models/{name}/latest.pkl"
+        )
     except Exception as e:
         log.warning("R2 upload failed, saving locally", error=str(e))
         import os
+
         os.makedirs(f"models/{name}", exist_ok=True)
         with open(f"models/{name}/latest.pkl", "wb") as f:
             f.write(serialize_onboarding_model(model, scaler))
@@ -91,22 +100,30 @@ def save_model(model, scaler, name: str = "onboarding-xgb"):
 @task(name="build-onboarding-model-card")
 def build_card(lr_metrics, xgb_metrics, cal, tiers, X_train, X_test, y_train, y_test):
     """Build model card with full metadata and save to R2."""
-    import numpy as np
 
     # Feature names from the encoded dataset
     feature_names = [
-        "account_age_days", "phone_verified", "document_verification_score",
-        "ip_country_matches_document", "device_fingerprint_seen_before",
-        "transaction_velocity_first_24h", "signup_hour", "initial_deposit_usd",
-        "email_domain_type_disposable", "email_domain_type_free",
-        "document_type_national_id", "document_type_passport",
-        "referral_source_paid", "referral_source_referral", "referral_source_social",
+        "account_age_days",
+        "phone_verified",
+        "document_verification_score",
+        "ip_country_matches_document",
+        "device_fingerprint_seen_before",
+        "transaction_velocity_first_24h",
+        "signup_hour",
+        "initial_deposit_usd",
+        "email_domain_type_disposable",
+        "email_domain_type_free",
+        "document_type_national_id",
+        "document_type_passport",
+        "referral_source_paid",
+        "referral_source_referral",
+        "referral_source_social",
     ]
 
     card = build_model_card(
         name="onboarding-xgb",
         description="Calibrated XGBoost for KYC onboarding risk scoring. "
-                    "Platt-scaled probabilities for meaningful risk tiers (low/medium/high/blocked).",
+        "Platt-scaled probabilities for meaningful risk tiers (low/medium/high/blocked).",
         metrics={
             "logistic_regression": lr_metrics,
             "calibrated_xgboost": xgb_metrics,
@@ -130,9 +147,7 @@ def build_card(lr_metrics, xgb_metrics, cal, tiers, X_train, X_test, y_train, y_
             "base_n_estimators": 200,
             "base_max_depth": 5,
         },
-        feature_importance=[
-            {"feature": name, "importance": 0.0} for name in feature_names
-        ],
+        feature_importance=[{"feature": name, "importance": 0.0} for name in feature_names],
         curves={
             "calibration": cal,
             "per_tier": tiers,
@@ -152,10 +167,10 @@ def create_artifacts(lr_metrics, xgb_metrics, card):
 ## Model Comparison
 | Metric | Logistic Regression | Calibrated XGBoost |
 |--------|--------------------|--------------------|
-| Accuracy | {lr_metrics['accuracy']:.4f} | {xgb_metrics['accuracy']:.4f} |
-| F1 (macro) | {lr_metrics['f1_macro']:.4f} | {xgb_metrics['f1_macro']:.4f} |
-| F1 (weighted) | {lr_metrics['f1_weighted']:.4f} | {xgb_metrics['f1_weighted']:.4f} |
-| Log Loss | {lr_metrics['log_loss']:.4f} | {xgb_metrics['log_loss']:.4f} |
+| Accuracy | {lr_metrics["accuracy"]:.4f} | {xgb_metrics["accuracy"]:.4f} |
+| F1 (macro) | {lr_metrics["f1_macro"]:.4f} | {xgb_metrics["f1_macro"]:.4f} |
+| F1 (weighted) | {lr_metrics["f1_weighted"]:.4f} | {xgb_metrics["f1_weighted"]:.4f} |
+| Log Loss | {lr_metrics["log_loss"]:.4f} | {xgb_metrics["log_loss"]:.4f} |
 
 ## Per-Tier Analysis
 """
@@ -163,7 +178,11 @@ def create_artifacts(lr_metrics, xgb_metrics, card):
     if tiers:
         markdown += "| Tier | Actual | Predicted | TPR |\n|------|--------|-----------|-----|\n"
         for t in tiers:
-            markdown += f"| {t['tier']} | {t['actual_count']} | {t['predicted_count']} | {t['true_positive_rate']:.3f} |\n"
+            markdown += (
+                f"| {t['tier']} | {t['actual_count']}"
+                f" | {t['predicted_count']}"
+                f" | {t['true_positive_rate']:.3f} |\n"
+            )
 
     create_markdown_artifact(key="onboarding-metrics", markdown=markdown)
 

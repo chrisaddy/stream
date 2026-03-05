@@ -27,6 +27,7 @@ _error_adwin = None
 def _init_error_adwin():
     global _error_adwin
     from river.drift import ADWIN
+
     _error_adwin = ADWIN(delta=0.002)
 
 
@@ -71,6 +72,7 @@ def _trigger_adaptation() -> dict:
     # Reset ADWIN drift detector
     try:
         from stream.drift.monitor import reset_adwin, reset_baseline
+
         reset_adwin()
         reset_baseline()
     except Exception as e:
@@ -79,6 +81,7 @@ def _trigger_adaptation() -> dict:
     # Reset online metrics
     try:
         from stream.online.metrics import reset
+
         reset()
     except Exception as e:
         _log_event("RESET_ERROR", f"Metrics reset failed: {e}")
@@ -86,6 +89,7 @@ def _trigger_adaptation() -> dict:
     # Reset model race
     try:
         from stream.online.race import reset_race
+
         reset_race()
     except Exception as e:
         _log_event("RESET_ERROR", f"Race reset failed: {e}")
